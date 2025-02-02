@@ -598,13 +598,13 @@ class HtmlFrame(ttk.Frame):
             }
 
             set newHtml "%s"
-            set oldmode [$tkw cget -parsemode]
-            $tkw configure -parsemode html
+            #set oldmode [$tkw cget -parsemode]
+            #$tkw configure -parsemode html
             # Insert the new descendants, created by parseing $newHtml.
             set children [$tkw fragment $newHtml]
             $node insert $children
 
-            $tkw configure -parsemode $oldmode
+            #$tkw configure -parsemode $oldmode
             update
             """ % (self.html, extract_nested(node), escape_Tcl(new))
         )
