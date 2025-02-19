@@ -118,17 +118,17 @@ class CSSStyleDeclaration:
         return self.html.get_node_property(self.node, prop, "-inline")
 
     def __setitem__(self, prop, value):
-        style = self.html.get_node_properties(self.node, "-inline")
-        style[prop] = value
-        sStr = " ".join(f"{p}: {v};" for p, v in style.items())
-        self.html.set_node_attribute(self.node, "style", sStr)
-        return style[prop]
+        current = self.html.get_node_properties(self.node, "-inline")
+        current[prop] = value
+        style = " ".join(f"{p}: {v};" for p, v in current.items())
+        self.html.set_node_attribute(self.node, "style", style)
+        return current[prop]
 
     def removeProperty(self, prop):
-        style = self.html.get_node_properties(self.node, "-inline")
-        val = style.pop(prop, "")
-        sStr = " ".join(f"{p}: {v};" for p, v in style.items())
-        self.html.set_node_attribute(self.node, "style", sStr)
+        current = self.html.get_node_properties(self.node, "-inline")
+        val = current.pop(prop, "")
+        style = " ".join(f"{p}: {v};" for p, v in current.items())
+        style.html.set_node_attribute(self.node, "style", style)
         return val
 
     @property
@@ -138,7 +138,7 @@ class CSSStyleDeclaration:
     @cssText.setter
     def cssText(self, newstyle):
         if not re.match(r"^([a-zA-Z-]+:\s[^;]+;\s?)+$", newstyle):
-            raise ValueError("SYNTAX_ERR")
+            raise ValueError("SYNTAX_ERR")  # Check if syntax invalid
         self.html.set_node_attribute(self.node, "style", newstyle)
 
     @property
@@ -306,3 +306,19 @@ class HtmlElement:
         "Return a list of elements that match a given CSS selector"
         nodes = self.html.search(query, root=self.node)
         return tuple(HtmlElement(self.html, node) for node in nodes)
+
+    @property
+    def id(self):
+        return self.html.get_node_attribute(self.node, "id")
+
+    @id.setter
+    def id(self, new):
+        return self.html.set_node_attribute(self.node, "id", new)
+
+    @property
+    def className(self):
+        return self.html.get_node_attribute(self.node, "class")
+
+    @className.setter
+    def className(self, new):
+        return self.html.set_node_attribute(self.node, "class", new)
