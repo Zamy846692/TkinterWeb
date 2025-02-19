@@ -8,6 +8,7 @@ Copyright (c) 2025 Andereoo
 """
 
 from utilities import extract_nested
+import re
 
 
 def escape_Tcl(string):
@@ -123,9 +124,22 @@ class CSSStyleDeclaration:
         self.html.set_node_attribute(self.node, "style", sStr)
         return style[prop]
 
+    def removeProperty(self, prop):
+        style = self.html.get_node_properties(self.node, "-inline")
+        val = style.pop(prop, "")
+        sStr = " ".join(f"{p}: {v};" for p, v in style.items())
+        self.html.set_node_attribute(self.node, "style", sStr)
+        return val
+
     @property
     def cssText(self):
         return self.html.get_node_attribute(self.node, "style")
+
+    @cssText.setter
+    def cssText(self, newstyle):
+        if not re.match(r"^([a-zA-Z-]+:\s[^;]+;\s?)+$", newstyle):
+            raise ValueError("SYNTAX_ERR")
+        self.html.set_node_attribute(self.node, "style", newstyle)
 
     @property
     def length(self):
