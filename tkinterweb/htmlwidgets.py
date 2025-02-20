@@ -277,9 +277,7 @@ Otherwise, use 'insecure=True' when loading a page to ignore website certificate
 
     def resolve_uri(self):
         base = urlparse(self.html.base_url)
-        uri = f"{base.scheme}://{base.netloc}{base.path}"
-        print(uri)
-        return uri
+        return f"{base.scheme}://{base.netloc}{base.path}"
 
     def stop(self):
         "Stop loading a page"
