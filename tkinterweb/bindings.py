@@ -1531,7 +1531,8 @@ class TkinterWeb(tk.Widget):
         widgets = self.search(f"[{self.embedded_widget_attr_name}]")
         for node in widgets:
             widgetid = self.get_node_attribute(node, self.embedded_widget_attr_name)
-            widgetid = self.nametowidget(widgetid)
+            try: widgetid = self.nametowidget(widgetid)
+            except KeyError: return
             if widgetid.winfo_ismapped():  # Don't display the same widget twice
                 continue
             allowscrolling = self.get_node_attribute(node, "allowscrolling")
