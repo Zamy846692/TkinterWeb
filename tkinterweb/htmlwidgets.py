@@ -5,11 +5,11 @@ by adding scrolling, file loading, and many other convenience functions
 Copyright (c) 2021-2025 Andereoo
 """
 
-from bindings import TkinterWeb
-from utilities import *
-from utilities import __version__
-from imageutils import create_RGB_image
-from dom import HTMLDocument, HTMLElement
+from .bindings import TkinterWeb
+from .utilities import *
+from .utilities import __version__
+from .imageutils import create_RGB_image
+from .dom import HTMLDocument, HTMLElement
 
 from tkinter import ttk
 from tkinter.ttk import Frame, Style
