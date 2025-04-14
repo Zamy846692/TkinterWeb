@@ -11,9 +11,6 @@ from .imageutils import *
 from .utilities import *
 from .subwidgets import *
 
-from tkinterweb_tkhtml import get_tkhtml_folder, load_tkhtml
-
-
 class TkinterWeb(Widget):
     "Bindings for the Tkhtml3 HTML widget."
 
@@ -970,10 +967,15 @@ class TkinterWeb(Widget):
 
     def get_child_text(self, node):  # Might be better off in htmlwidgets.py
         """Get text of node and all its descendants recursively"""
-        text = self.get_node_text(node, "-pre")
-        for child in self.get_node_children(node):
-            text += self.get_element_text(child)
-        return text
+        self.tk.createcommand("childtext", self.get_child_text)
+        return self.tk.eval("""
+            set text [%s -pre]
+            foreach child [%s children] {
+                append text [childtext $child]
+            }
+            return $text
+            """, (node, node)
+        )
     
     def resolve_url(self, url):
         "Generate a full url from the specified url."
