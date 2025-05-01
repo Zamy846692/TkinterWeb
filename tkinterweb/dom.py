@@ -248,8 +248,8 @@ class HTMLElement:
     def __init__(self, document_manager, node):
         self.document = document_manager
         self.html = document_manager.html
-        self.node = flatten(node)
-        self.style_cache = None  # initialize style as None
+        self.node = extract_nested(node)
+        self._style_cache = None  # initialize style as None
         self.html.get_node_tkhtml(node)  # check if the node is valid, rises invalid command error if not.
         DOM_element_events(self)
 
@@ -556,11 +556,11 @@ class HTMLElement:
         return self.setAttribute("class", new)
     
     def _insert_children(self, children, before=None):  # Helper method to insert children at a specified position
-        # ensure children is a list
+        # Ensure children is a list
         children = {children} if isinstance(children, HTMLElement) else children
-        # extract node commands
+        # Extract node commands
         tkhtml_child_nodes = tuple(i.node for i in children)
-        # insert the nodes based on the position
+        # Insert the nodes based on the position
         if before:
             self.html.insert_node_before(self.node, tkhtml_child_nodes, before.node)
         else:
@@ -594,7 +594,7 @@ class HTMLCollection:
         for i in self.html.search(self.searchCmd, root=self.node):
             if key in (self.html.get_node_attribute(i, j) for j in ("id", "name")):
                 return HTMLElement(self.docu, i)
-        return None
+        return None  # If nothing is found
 
 class DOMRect:
     """This class generates and stores information about the element's position and size at this point in time.
