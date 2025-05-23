@@ -2066,32 +2066,39 @@ class TkinterHv3(tk.Widget):
 
     def __init__(self, master, hv, **kwargs):
         folder = get_tkhtml_folder()
-        try:
-            auto_path = load_tkhtml(master, folder, )
-            Widget.__init__(self, master, "html", kwargs)
-        except TclError:
-            auto_path = load_tkhtml(master, folder, True)
-            Widget.__init__(self, master, "html", kwargs)
+        try: load_tkhtml(master, folder, )
+        except TclError: load_tkhtml(master, folder, True)
+
+        if "headers" in kwargs: self.headers = kwargs.pop("headers")
+        else: self.headers = HEADERS
 
         master.tk.eval("set auto_path [linsert $auto_path 0 %s]" % hv)
-
         master.tk.eval("package require snit")
         master.tk.eval("package require hv3")
         if "requestcmd" not in kwargs:
             kwargs["requestcmd"] = master.register(self._requestcmd)
         Widget.__init__(self, master, "::hv3::hv3", kwargs)
-    
+        self.focus_set()
+
     def _requestcmd(self, handle):
         uri = self.tk.call(handle, "cget", "-uri")
+        self.tk.call(
+            handle, "configure", "-header", " ".join(f"{k} {{{v}}}" for k, v in self.headers.items())
+        )
         print(uri)
-        download = self._download_url(uri)
-        self.tk.call(handle, "finish", download[0])
-
-    def _download_url(self, url):
-        if url.startswith("file://"):
-            return download(url, insecure=False, headers=tuple(HEADERS.items()))
+        head = (self.tk.call(handle, "cget", "-header"),)
+        parsed = self.tk.call("::tkhtml::uri", uri)
+        if self.tk.call(parsed, "scheme") == "file":
+            data = download(uri, insecure=False, headers=head)
+        elif self.tk.call(parsed, "scheme") == "home":
+            data = (self.tk.call(parsed, "path").lstrip("/"),)
         else:
-            return cache_download(url, insecure=False, headers=tuple(HEADERS.items()))
+            data = cache_download(uri, insecure=False, headers=head)
+        self.tk.call(handle, "finish", data[0])
+        self.tk.call(parsed, "destroy")
 
     def goto(self, url):
         self.tk.call(self._w, "goto", url)
+
+    def stop(self):
+        self.tk.call(self._w, "stop")
