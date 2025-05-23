@@ -2082,18 +2082,15 @@ class TkinterHv3(tk.Widget):
 
     def _requestcmd(self, handle):
         uri = self.tk.call(handle, "cget", "-uri")
-        self.tk.call(
-            handle, "configure", "-header", " ".join(f"{k} {{{v}}}" for k, v in self.headers.items())
-        )
+        head_str = " ".join(f"{k} {{{v}}}" for k, v in self.headers.items())
+        self.tk.call(handle, "configure", "-header", head_str)
         print(uri)
-        head = (self.tk.call(handle, "cget", "-header"),)
+        kw = dict(url=uri, insecure=False, headers=(self.tk.call(handle, "cget", "-header"),))
         parsed = self.tk.call("::tkhtml::uri", uri)
-        if self.tk.call(parsed, "scheme") == "file":
-            data = download(uri, insecure=False, headers=head)
+        if self.tk.call(parsed, "scheme") == "file": data = download(**kw)
         elif self.tk.call(parsed, "scheme") == "home":
             data = (self.tk.call(parsed, "path").lstrip("/"),)
-        else:
-            data = cache_download(uri, insecure=False, headers=head)
+        else: data = cache_download(**kw)
         self.tk.call(handle, "finish", data[0])
         self.tk.call(parsed, "destroy")
 
