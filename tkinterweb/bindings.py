@@ -2082,9 +2082,9 @@ class TkinterHv3(tk.Widget):
 
     def _requestcmd(self, handle):
         uri = self.tk.call(handle, "cget", "-uri")
+        print(uri)
         head_str = " ".join(f"{k} {{{v}}}" for k, v in self.headers.items())
         self.tk.call(handle, "configure", "-header", head_str)
-        print(uri)
         kw = dict(url=uri, insecure=False, headers=(self.tk.call(handle, "cget", "-header"),))
         parsed = self.tk.call("::tkhtml::uri", uri)
         if self.tk.call(parsed, "scheme") == "file": data = download(**kw)
@@ -2099,3 +2099,21 @@ class TkinterHv3(tk.Widget):
 
     def stop(self):
         self.tk.call(self._w, "stop")
+
+    def reset(self):
+        self.tk.call(self._w, "reset")
+
+    def node(self):
+        return self.tk.call(self._w, "node")
+
+    def html(self):
+        return self.tk.call(self._w, "html")
+
+    def title(self):
+        return self.tk.call(self._w, "title")
+
+    def location(self):
+        return self.tk.call(self._w, "location")
+
+    def selected(self):
+        return self.tk.call(self._w, "selected")
