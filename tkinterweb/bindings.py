@@ -2298,8 +2298,8 @@ class TkinterWeb(Widget):
 
     def tkhtml_uri_decode(self, uri, base64=False):
         "This command is designed to help scripts process data: URIs. It is completely separate from the html widget"
-        a = "-base64" if base64 else ""
-        return self.tk.call("::tkhtml::decode", a, uri)
+        c = ("::tkhtml::decode", "-base64", uri) if base64 else ("::tkhtml::decode", uri)
+        return self.tk.call(*c).strip(b"}")
 
     def tkhtml_uri_encode(self, uri):
         "Encodes - _ . ! ~ * ' ( )"
