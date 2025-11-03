@@ -1957,13 +1957,26 @@ class HtmlParse(HtmlFrame):
 
         self._is_destroying = False
 
-        for flag in {"events_enabled", "images_enabled", "forms_enabled"}:
+        for flag in ["events_enabled", "images_enabled", "forms_enabled", "stylesheets_enabled"]:
             if flag not in kwargs:
                 kwargs[flag] = False
-                
-        HtmlFrame.__init__(self, root, **kwargs)
+
+        self.root = root = tk.Tk()
+        self.html = html = TkinterWeb(root, kwargs)
+        self.document = HTMLDocument(html)
+
+        if markup:
+            if os.path.isfile(markup): markup = "file:///" + markup
+            parsed = urlparse(markup)
+            if parsed.scheme in frozenset({"file", "https", "http"}):
+                markup, url, file, r = html._download_url(markup)
+
+            html.parse(markup)
 
         root.withdraw()
+
+    def __str__(self):
+        return f"<html>{self.document.documentElement.innerHTML}</html>"
 
     def destroy(self):
         super().destroy()
