@@ -1228,7 +1228,7 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
             except TypeError:
                 pass
             return text, offset
-        
+
     def _set_cursor(self, cursor):
         "Set the document cursor."
         if self._current_cursor != cursor:
@@ -1551,14 +1551,12 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
 
             if self.current_active_node and self.stylesheets_enabled:
                 self.remove_node_flags(self.current_active_node, "active")
+            if node_tag == "input":
+                if node_type == "reset":
+                    self._handle_form_reset(node_handle)
+                elif node_type in {"submit", "image"}:
+                    self._handle_form_submission(node_handle)
 
-            if self.text_mode and not (event.state & 0x4):
-                return
-            
-            if node_tag == "input" and node_type == "reset":
-                self.form_manager._handle_form_reset(node_handle)
-            elif node_tag == "input" and node_type in {"submit", "image"}:
-                self.form_manager._handle_form_submission(node_handle)
             else:
                 for node in self.hovered_nodes:
                     if node != node_handle:
@@ -1573,10 +1571,14 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
                         if node_type == "submit":
                             self.form_manager._handle_form_submission(node)
                             break
-        except tk.TclError:
-            pass
-
-        self.current_active_node = None
+                        elif node_tag == "button":
+                            if node != node_handle:
+                                node_type = self.get_node_attribute(node, "type").lower()
+                            if node_type == "submit":
+                                self._handle_form_submission(node)
+                                break
+        except TclError: pass
+        self.prev_active_node = None
 
     def _on_double_click(self, event):
         "Cycle between normal selection, text selection, and element selection on multi-clicks."
@@ -1672,6 +1674,314 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
         utilities.deprecate("send_onload", "event_manager")
         return self.event_manager.send_onload(root, children)
 
+
+    def tkhtml_uri_decode(self, uri, base64=False):
+        "This command is designed to help scripts process data: URIs. It is completely separate from the html widget"
+        c = ("::tkhtml::decode", "-base64", uri) if base64 else ("::tkhtml::decode", uri)
+        return self.tk.call(*c).strip(b"}")
+
+    def tkhtml_uri_encode(self, uri):
+        "Encodes the uri."
+        return self._html.tk.call("::tkhtml::encode", uri)
+
+    def tkhtml_uri_escape(self, uri, query=False):
+        "Returns the decoded data."
+        a = "-query" if query else ""
+        return self._html.tk.call("::tkhtml::escape_uri", a, uri)
+
+class CaretManager:
+    """An extension to manage the caret's state. Largely internal. 
+    
+    Only interact with this object if the convenience methods provided by the :class:`.HtmlFrame` widget are not sufficient.
+
+    This object can be accessed through the :attr:`~tkinterweb.TkinterWeb.caret_manager` property of the :class:`~tkinterweb.TkinterWeb` widget.
+
+    :ivar node: The node the caret is in.
+    :ivar offset: The caret's offset within the node.
+    :ivar index: The document text index of the start of the node; fallback if the node is deleted.
+    :ivar caret_frame: The blinky widget.
+    :ivar target_offset: The text offset used for traversing up/down.
+    :ivar blink_delay: The caret's blink delay, in milliseconds. 
+    :ivar caret_colour: The caret's colour. If None, the text colour under it will be matched.
+    :ivar scrolling_threshold: If the distance between the visible part of the page and the caret is nonzero but is less than this number, a scrolling animation will play.
+    :ivar scrolling_teleport: If the distance between the visible part of the page and the caret is nonzero but is greater than :attr:`scrolling_threshold`, the page is scrolled to this number before the scrolling animation plays.
+    
+    New in version 4.8."""
+    
+    def __init__(self, html):
+        self.html = html
+
+        self.node = None
+        self.offset = None
+        self.index = None
+        self.caret_frame = None
+        #self.target_node = None
+        self.target_offset = None
+
+        self.blink_delay = 600
+        self.caret_colour = None
+        self.scrolling_threshold = 300 
+        self.scrolling_teleport = 75
+
+    def set(self, node, offset, recalculate=False):
+        "Set the caret's position."
+        if not node and not recalculate: return
+        if self.html._caret_browsing_enabled:
+            if not node:
+                self.index = offset
+                self.node, self.offset = self.html.text("index", offset)
+                self.target_offset = self.offset
+                fallback = self.shift_left
+            elif recalculate:
+                # If the caret's position is being set by the user, determine the node and offset using the document text
+                # This allows for shifting before and past the node
+                self.index = self.html.text("offset", node, 0)
+                self.node, self.offset = self.html.text("index", self.index + offset)
+                self.target_offset = self.offset
+                if offset > 0:
+                    fallback = self.shift_left
+                else:
+                    fallback = self.shift_right
+            else:
+                self.node = node #self.target_node = node
+                self.offset = self.target_offset = offset
+                self.index = self.html.text("offset", node, 0)
+                fallback = self.shift_left
+            self.update(fallback=fallback)
+
+    def is_placed(self):
+        "Check if the caret has been placed onto the document."
+        return True if self.node else False
+
+    def register_nodes_from_index(self, event, index, update_caret_start=False):
+        "Update the caret's internal state."
+        node, offset = self.html.text("index", index)
+        self.index = self.html.text("offset", node, 0)
+
+        if event:
+            if (event.state & 0x1) != 0:
+                if not self.html.selection_start_node:
+                    self.html.selection_start_node = self.node
+                    self.html.selection_start_offset = self.offset
+                self.node, self.offset = node, offset
+                self.html.selection_end_node = self.node
+                self.html.selection_end_offset = self.offset
+            else:
+                self.node, self.offset = node, offset
+        else:
+            self.node, self.offset = node, offset
+        
+        if update_caret_start:
+            #self.target_node = self.node
+            self.target_offset = self.offset
+
+    def shift_up(self, event=None):     
+        "Shift the caret up."   
+        if self.node:
+            index = self.html.text("offset", self.node, self.offset)
+            text = self.html.text("text")
+
+            if type(index) == str: index = self.index
+
+            # Get the previous newline
+            index = text.rfind("\n", 0, index)
+
+            if index == -1:
+                index = 0
+            else:
+                # Ensure that the index we land on is not blank or a newline
+                while index > 0 and text[index] in {" ", "\n"}:
+                    index -= 1
+
+                # Get the beginning of the line
+                beginning_index = text.rfind("\n", 0, index)
+                if beginning_index != -1:
+                    index += 1
+                    # Attempt to go to the offset in that line corresponding to self.target_offset
+                    # If the line is too short, go to the end of the line
+                    ideal_index = beginning_index + self.target_offset + 1
+
+                    if ideal_index < index:
+                        index = ideal_index
+
+            self.register_nodes_from_index(event, index)
+            self.update(event)
+
+    def shift_down(self, event=None):
+        "Shift the caret down."
+        if self.node:
+            index = self.html.text("offset", self.node, self.offset)
+            text = self.html.text("text").rstrip("\n") + "\n"
+            text_length = len(text) - 1
+
+            if type(index) == str: index = self.index
+
+            # Get the next newline
+            index = text.find("\n", index)
+            if index == -1:
+                index = text_length
+            else:
+                # Ensure that the index we land on is not blank or a newline
+                while index < text_length and text[index] in {" ", "\n"}:
+                    index += 1
+
+                # Attempt to go to the offset in that line corresponding to self.target_offset
+                # If the line is too short, go to the end of the line
+                ideal_index = index + self.target_offset
+
+                if ideal_index < text_length:
+                    newline_pos = text.find("\n", index, ideal_index)
+                    if newline_pos != -1:
+                        index = newline_pos
+                    else:
+                        index = ideal_index
+
+            self.register_nodes_from_index(event, index)
+            self.update(event)
+
+    def shift_left(self, event=None, update_caret_start=True):
+        "Shift the caret left."
+        if self.node:
+            index = self.html.text("offset", self.node, self.offset)
+            text = self.html.text("text")
+            if type(index) == str: index = self.index
+            if index > len(text): index = len(text)
+            
+            # Shift left one letter
+            index -= 1
+
+            # If Ctrl is pressed, shift to the end of the previous space or newline
+            if event and ((event.state & 0x4) != 0):
+                index = max(text.rfind(" ", 0, index), text.rfind("\n", 0, index))
+                if index == -1: 
+                    index = 0
+                else:
+                    index += 1
+            else:
+                # Ensure that the index we land on is not a newline
+                changed = False
+                while index > 0 and text[index] == "\n":
+                    index -= 1
+                    changed = True
+                if changed:
+                    index += 1
+            
+            self.register_nodes_from_index(event, index, update_caret_start)
+            self.update(event)
+
+    def shift_right(self, event=None, update_caret_start=True):
+        "Shift the caret right."
+        if self.node:
+            index = self.html.text("offset", self.node, self.offset)
+            text = self.html.text("text").rstrip("\n") + "\n"
+            text_length = len(text) - 1
+
+            if type(index) == str: index = self.index
+
+            if event and ((event.state & 0x4) != 0):
+                # If Ctrl is pressed, shift to the start of the next space or newline
+                next_positions = [i for i in (text.find(" ", index + 1), text.find("\n", index + 1)) if i != -1]
+                index = min(next_positions) if next_positions else text_length
+            else:
+                # Ensure that the index we land on is not a newline
+                changed = False
+                while index < text_length and text[index] == "\n":
+                    index += 1
+                    changed = True
+                # Otherwise, shift right one letter
+                if not changed and index < text_length:
+                    index += 1
+
+            self.register_nodes_from_index(event, index, update_caret_start)
+            self.update(event, fallback=self.shift_right)
+
+    def update(self, event=None, auto_scroll=True, fallback=None):
+        "Refresh the caret or update its position."
+        if not fallback:
+            fallback = self.shift_left
+
+        if self.html._caret_browsing_enabled and self.node:
+            self.html.update() # Particularly important when this method runs after the document is scrolled
+            if not self.caret_frame:
+                self.caret_frame = BlinkyFrame(self.html, blink_delay=self.blink_delay, width=1)
+                
+            try:
+                a, b, c, d = self.html.text("bbox", self.node, self.offset, self.node, self.offset)
+            except ValueError:
+                # A newline doesn't belong to the node
+                # If the caret is at the end of a line of text, the node returned will be different from the node we want to actually put the caret beside
+                # For some reason, when scrolling, the y values from bbox() of content that doesn't move with the document are sometimes wrong
+                # text("bbox") is more accurate
+                # However, offset is not defined for a node's end
+                # So we get the end of the previous character instead
+                try:
+                    a2, b, c2, d = self.html.text("bbox", self.node, self.offset-1, self.node, self.offset-1)
+                    a = c2
+                    c = c2 + (c2-a2)
+                except ValueError:
+                    return fallback(event, update_caret_start=False)
+                                
+            x1, y1, x2, y2 = self.html.bbox()
+            yoffset = self._scroll_if_needed(b, d, y1, y2, auto_scroll)
+            xoffset = self._scroll_if_needed(a, c, x1, x2, auto_scroll, 1)
+
+            if (xoffset != None) and (yoffset != None): # Otherwise, yview/xview automatically re-calls this function, so we exit
+                if self.caret_colour:
+                    bg = self.caret_colour
+                else:
+                    bg = self.html.get_node_property(self.html.get_node_parent(self.node), "color")
+                self.caret_frame.config(height=d-b, bg=bg)
+                self.caret_frame.place(x=a-xoffset, y=b-yoffset)
+            
+                if self.html.selection_enabled and event:
+                    if ((event.state & 0x1) != 0):
+                        self.html.update_selection()
+                    else:
+                        self.html.clear_selection()
+
+    def hide(self):
+        "Hide the caret. Show the caret again by calling :meth:`.CaretManager.update`."
+        if self.node:
+            self.caret_frame.place_forget()
+
+    def reset(self):
+        "Hide the caret and reset its position."
+        if self.node:
+            self.node = None
+            self.offset = None
+            self.caret_frame.place_forget()
+
+    def _scroll_if_needed(self, node_start, node_end, viewport_start, viewport_end, auto_scroll, direction=0):
+        """Scroll the caret into view if needed.
+        We could scroll directly to the correct position,
+        But it's easier to let Tkhtml do the work of detecting lines.
+        Using yview_moveto, for instance, can be used to scroll to the top of the node,
+        But then a node on the same line that is taller would be cut off.
+        So we use moveto to get close if needed and use scroll to do the rest.
+        As a side effect, this gives us a bit of a scrolling animation, which I think is a good thing if anything."""
+        if direction: 
+            command = self.html.xview
+        else:
+            command = self.html.yview
+
+        start, end = command()
+        top_offset = start * (viewport_end - viewport_start)
+        bottom_offset = end * (viewport_end - viewport_start)
+
+        if auto_scroll:
+            if node_end >= 0 and (node_end - self.scrolling_threshold) > bottom_offset:
+                command("moveto", (node_end - self.html.winfo_height() - self.scrolling_teleport) / viewport_end, auto_scroll=True)
+                return None
+            elif node_end >= 0 and node_end > bottom_offset:
+                command("scroll", 1, "units", auto_scroll=True)
+                return None
+            elif node_start >= 0 and (node_start + self.scrolling_threshold) < top_offset:
+                command("moveto", (node_start + self.scrolling_teleport) / viewport_end, auto_scroll=True)
+                return None
+            elif node_start >= 0 and node_start < top_offset:
+                command("scroll", -1, "units", auto_scroll=True)
+                return None
+        return top_offset
 
 class TkHtmlParsedURI:
     """Bindings for the Tkhtml URI parsing system. 
