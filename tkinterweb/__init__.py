@@ -10,7 +10,7 @@ Copyright (c) 2021-2025 Andrew Clarke
 try:
     from .htmlwidgets import HtmlFrame, HtmlLabel, HtmlText, HtmlParse
     from .subwidgets import Notebook
-    from .bindings import TkHtmlParsedURI, TkinterWeb
+    from .bindings import TkHtmlParsedURI, TkinterWeb, TkinterHv3
     from .utilities import __title__, __author__, __copyright__, __license__, __version__
 except (ImportError, ModuleNotFoundError) as error:
     import sys
