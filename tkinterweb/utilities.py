@@ -24,6 +24,8 @@ try:
 except ImportError:
     brotli_installed = False
 
+from collections import namedtuple
+
 from _thread import RLock
 from functools import update_wrapper, _make_key
 
@@ -677,6 +679,7 @@ JS_EVENT_MAP = {
     "onmiddlemouse": "onmousedown",
     "onmouseb1move": None,
 }
+SplitFrag = namedtuple("SplitFrag", ("uri", "fragment"))
 
 class StoppableThread(threading.Thread):
     "A thread that stores a state flag that can be set and used to check if the thread is supposed to be running"
