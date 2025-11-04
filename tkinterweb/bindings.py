@@ -2076,15 +2076,21 @@ class TkinterHv3(tk.Widget):
         hv = "C:/Users/billa/OneDrive/Documents/test1/htmlwidget/tkhtml/hv"
         master.tk.eval("set auto_path [linsert $auto_path 0 %s]" % hv)
 
-        master.tk.eval('package require snit')
-        master.tk.eval('package require hv3')
+        master.tk.eval("package require snit")
+        master.tk.eval("package require hv3")
         kwargs["requestcmd"] = master.register(self._requestcmd)
-        Widget.__init__(self, master, '::hv3::hv3', kwargs)
-
+        Widget.__init__(self, master, "::hv3::hv3", kwargs)
+    
     def _requestcmd(self, handle):
         uri = self.tk.call(handle, "cget", "-uri")
-        self.tk.call(handle, "append", cache_download(uri, insecure=False, headers=tuple(HEADERS.items())))
-        self.tk.call(handle, "finish")
+        print(uri)
+        self.tk.call(handle, "finish", self._download_url(uri)[0])
+
+    def _download_url(self, url):
+        if url.startswith("file://"):
+            return download(url, insecure=False, headers=tuple(HEADERS.items()))
+        else:
+            return cache_download(url, insecure=False, headers=tuple(HEADERS.items()))
 
     def goto(self, url):
         self.tk.call(self._w, "goto", url)
