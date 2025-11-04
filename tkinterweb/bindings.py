@@ -2064,7 +2064,7 @@ class TkHtmlParsedURI:
 class TkinterHv3(tk.Widget):
     """JUST AN EXPERIMENT, PRE-ALPHA!"""
 
-    def __init__(self, master, **kwargs):
+    def __init__(self, master, hv, **kwargs):
         folder = get_tkhtml_folder()
         try:
             auto_path = load_tkhtml(master, folder, )
@@ -2073,18 +2073,19 @@ class TkinterHv3(tk.Widget):
             auto_path = load_tkhtml(master, folder, True)
             Widget.__init__(self, master, "html", kwargs)
 
-        hv = "C:/Users/billa/OneDrive/Documents/test1/htmlwidget/tkhtml/hv"
         master.tk.eval("set auto_path [linsert $auto_path 0 %s]" % hv)
 
         master.tk.eval("package require snit")
         master.tk.eval("package require hv3")
-        kwargs["requestcmd"] = master.register(self._requestcmd)
+        if "requestcmd" not in kwargs:
+            kwargs["requestcmd"] = master.register(self._requestcmd)
         Widget.__init__(self, master, "::hv3::hv3", kwargs)
     
     def _requestcmd(self, handle):
         uri = self.tk.call(handle, "cget", "-uri")
         print(uri)
-        self.tk.call(handle, "finish", self._download_url(uri)[0])
+        download = self._download_url(uri)
+        self.tk.call(handle, "finish", download[0])
 
     def _download_url(self, url):
         if url.startswith("file://"):
