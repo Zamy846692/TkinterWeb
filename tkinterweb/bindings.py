@@ -2060,3 +2060,31 @@ class TkHtmlParsedURI:
     def destroy(self):
         "Destroy this uri."
         self._html.tk.call(self.parsed, "destroy")
+
+class TkinterHv3(tk.Widget):
+    """JUST AN EXPERIMENT, PRE-ALPHA!"""
+
+    def __init__(self, master, **kwargs):
+        folder = get_tkhtml_folder()
+        try:
+            auto_path = load_tkhtml(master, folder, )
+            Widget.__init__(self, master, "html", kwargs)
+        except TclError:
+            auto_path = load_tkhtml(master, folder, True)
+            Widget.__init__(self, master, "html", kwargs)
+
+        hv = "C:/Users/billa/OneDrive/Documents/test1/htmlwidget/tkhtml/hv"
+        master.tk.eval("set auto_path [linsert $auto_path 0 %s]" % hv)
+
+        master.tk.eval('package require snit')
+        master.tk.eval('package require hv3')
+        kwargs["requestcmd"] = master.register(self._requestcmd)
+        Widget.__init__(self, master, '::hv3::hv3', kwargs)
+
+    def _requestcmd(self, handle):
+        uri = self.tk.call(handle, "cget", "-uri")
+        self.tk.call(handle, "append", cache_download(uri, insecure=False, headers=tuple(HEADERS.items())))
+        self.tk.call(handle, "finish")
+
+    def goto(self, url):
+        self.tk.call(self._w, "goto", url)
