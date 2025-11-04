@@ -2065,9 +2065,10 @@ class TkinterHv3(tk.Widget):
     """JUST AN EXPERIMENT, PRE-ALPHA!"""
 
     def __init__(self, master, hv, **kwargs):
-        folder = get_tkhtml_folder()
-        try: load_tkhtml(master, folder, )
-        except TclError: load_tkhtml(master, folder, True)
+        self.master = master
+        self._setup_settings()
+
+        self._load_tkhtml()
 
         if "headers" in kwargs: self.headers = kwargs.pop("headers")
         else: self.headers = HEADERS
@@ -2075,22 +2076,75 @@ class TkinterHv3(tk.Widget):
         master.tk.eval("set auto_path [linsert $auto_path 0 %s]" % hv)
         master.tk.eval("package require snit")
         master.tk.eval("package require hv3")
+        
         if "requestcmd" not in kwargs:
             kwargs["requestcmd"] = master.register(self._requestcmd)
+            
         Widget.__init__(self, master, "::hv3::hv3", kwargs)
         self.focus_set()
 
+    def _setup_settings(self):
+        "Widget settings."
+        try:
+            self.allow_threading = bool(self.master.tk.call("set", "tcl_platform(threaded)"))
+        except tk.TclError: # if tcl_platform(threaded) doesn't exist, we can assume threading is enabled
+            self.allow_threading = True
+
+        self.messages_enabled = True
+        self.use_prebuilt_tkhtml = True
+        self.tkhtml_version = ""
+        self.experimental = False
+
+        self.message_func = placeholder
+        
+    def post_message(self, message):
+        "Post a message."
+        if self.messages_enabled:
+            self.message_func(message)
+
+    def _load_tkhtml(self):
+        "Load Tkhtml"
+        if self.tkhtml_version == "auto":
+            self.tkhtml_version = None
+
+        try:
+            loaded_version = tkinterweb_tkhtml.get_loaded_tkhtml_version(self.master)
+            self.post_message(f"Using Tkhtml {loaded_version} because it is already loaded")
+        except TclError:
+            if self.use_prebuilt_tkhtml:
+                try:
+                    file, loaded_version, self.experimental = tkinterweb_tkhtml.get_tkhtml_file(self.tkhtml_version, experimental=self.experimental)
+                    tkinterweb_tkhtml.load_tkhtml_file(self.master, file)
+                    self.post_message(f"Tkhtml {loaded_version} successfully loaded from {tkinterweb_tkhtml.TKHTML_ROOT_DIR}")
+                except TclError as error: # If something goes wrong, try again with version 3.0 in case it is a Cairo issue
+                    self.post_message(f"WARNING: An error occured while loading Tkhtml {loaded_version}: {error}\n\n\
+It is likely that not all dependencies are installed. Make sure Cairo is installed on your system. Some features may be missing.")
+                    file, loaded_version, self.experimental = tkinterweb_tkhtml.get_tkhtml_file(index=0, experimental=self.experimental)
+                    try:
+                        tkinterweb_tkhtml.load_tkhtml_file(self.master, file)
+                        self.post_message(f"Tkhtml {loaded_version} successfully loaded from {tkinterweb_tkhtml.TKHTML_ROOT_DIR}")
+                    except TclError as error: # If it still won't load it never will. It is most likely that the system is not supported. The user needs to compile and install Tkhtml.
+                        raise TclError(f"{error} It is likely that your system is not supported out of the box. {tkinterweb_tkhtml.HELP_MESSAGE}") from error
+            else:
+                tkinterweb_tkhtml.load_tkhtml(self.master)
+                loaded_version = tkinterweb_tkhtml.get_loaded_tkhtml_version(self.master)
+                self.post_message(f"Tkhtml {loaded_version} successfully loaded")
+
     def _requestcmd(self, handle):
         uri = self.tk.call(handle, "cget", "-uri")
-        print(uri)
         head_str = " ".join(f"{k} {{{v}}}" for k, v in self.headers.items())
         self.tk.call(handle, "configure", "-header", head_str)
-        kw = dict(url=uri, insecure=False, headers=(self.tk.call(handle, "cget", "-header"),))
+        header = self.tk.call(handle, "cget", "-header")
+        kw = dict(
+            url=uri, insecure=False, headers=tuple(zip(header[::2], header[1::2]))
+        )
         parsed = self.tk.call("::tkhtml::uri", uri)
-        if self.tk.call(parsed, "scheme") == "file": data = download(**kw)
+        if self.tk.call(parsed, "scheme") == "file":
+            data = download(**kw)
         elif self.tk.call(parsed, "scheme") == "home":
             data = (self.tk.call(parsed, "path").lstrip("/"),)
-        else: data = cache_download(**kw)
+        else:
+            data = cache_download(**kw)
         self.tk.call(handle, "finish", data[0])
         self.tk.call(parsed, "destroy")
 
@@ -2103,17 +2157,22 @@ class TkinterHv3(tk.Widget):
     def reset(self):
         self.tk.call(self._w, "reset")
 
+    @property
     def node(self):
         return self.tk.call(self._w, "node")
 
+    @property
     def html(self):
         return self.tk.call(self._w, "html")
 
+    @property
     def title(self):
         return self.tk.call(self._w, "title")
 
+    @property
     def location(self):
         return self.tk.call(self._w, "location")
 
+    @property
     def selected(self):
         return self.tk.call(self._w, "selected")
