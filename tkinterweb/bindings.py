@@ -986,17 +986,16 @@ If you benefited from using this package, please consider supporting its develop
     def load_alt_text(self, url, name):
         # NOTE: this must run in the main thread
 
-        if (url in self.image_directory):
-            node = self.image_directory[url]
-            if not self.ignore_invalid_images:
-                image = imageutils.data_to_image(utilities.BROKEN_IMAGE, name, "image/png", self._image_inversion_enabled, self.dark_theme_limit)
-            elif self.image_alternate_text_enabled:
+        if url in self.image_directory:
+            if self.image_alternate_text_enabled:
+                node = self.image_directory[url]
                 alt = self.get_node_attribute(node, "alt")
                 if alt:
-                    widgetid = tk.Text(self, bd=0, highlightbackground="lightgray", highlightthickness=1)
-                    widgetid.insert(index="1.0", chars=alt)
-                    widgetid["state"] = "disabled"
-                    self.replace_node_with_widget(node, widgetid)
+                    widgetid = tk.Text(
+                        self, bd=0, width=len(alt)+1, highlightbackground="white", highlightthickness=1,
+                        font=self.get_node_property(node, "font")  # Needs to be forced to work as handle_node_style wont always do it
+                    )
+                    widgetid.insert("1.0", chars=alt)
                     self.handle_node_replacement(
                         node, widgetid,
                         lambda widgetid=widgetid: self._handle_node_removal(widgetid),
@@ -1004,6 +1003,8 @@ If you benefited from using this package, please consider supporting its develop
                             node, widgetid, widgettype
                         ),
                     )
+                    widgetid.configure(height=int(widgetid.index('end').split('.')[0])-1)
+                    widgetid["state"] = "disabled"
 
         elif not self.ignore_invalid_images:
             image = imageutils.data_to_image(utilities.BROKEN_IMAGE, name, "image/png", self._image_inversion_enabled, self.dark_theme_limit)
