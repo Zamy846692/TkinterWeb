@@ -1945,39 +1945,44 @@ class HtmlText(HtmlFrame):
         self.configure(**kwargs)
 
 
-class HtmlParse(HtmlFrame):
+class HtmlParse():
     """The :class:`HtmlParse` class parses HTML but does not spawn a widget. It inherits from the :class:`HtmlFrame` class. 
     
     For a complete list of avaliable methods, properties, configuration options, and generated events, see the :class:`HtmlFrame` docs.
     
     New in version 4.4."""
-    
-    def __init__(self, **kwargs):
+    def __init__(self, markup="", **kwargs):
         self.root = root = tk.Tk()
-
-        self._is_destroying = False
+        root.withdraw()
 
         for flag in ["events_enabled", "images_enabled", "forms_enabled", "stylesheets_enabled"]:
             if flag not in kwargs:
                 kwargs[flag] = False
+
+        if "headers" not in kwargs: kwargs["headers"] = HEADERS
 
         self.root = root = tk.Tk()
         self.html = html = TkinterWeb(root, kwargs)
         self.document = HTMLDocument(html)
 
         if markup:
-            if os.path.isfile(markup): markup = "file:///" + markup
-            parsed = urlparse(markup)
-            if parsed.scheme in frozenset({"file", "https", "http"}):
-                markup, url, file, r = html._download_url(markup)
+            if os.path.isfile(markup):
+                markup = "file:///" + markup
+                markup, url, file, r = download(
+                    markup, headers=tuple(self.html.headers.items())
+                )
+
+            else:
+                parsed = urlparse(markup)
+                if parsed.scheme in frozenset({"https", "http"}):
+                    markup, url, file, r = cache_download(
+                        markup, headers=tuple(self.html.headers.items())
+                    )
 
             html.parse(markup)
-
-        root.withdraw()
 
     def __str__(self):
         return f"<html>{self.document.documentElement.innerHTML}</html>"
 
     def destroy(self):
-        super().destroy()
         self.root.destroy()
