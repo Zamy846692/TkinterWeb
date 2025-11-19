@@ -993,7 +993,7 @@ If you benefited from using this package, please consider supporting its develop
                 if alt:
                     widgetid = tk.Text(
                         self, bd=0, width=len(alt)+1, highlightbackground="white", highlightthickness=1,
-                        font=self.get_node_property(node, "font")  # Needs to be forced to work as handle_node_style wont always do it
+                        font=self.get_node_property(node, "font")  # Needs to be forced to work as handle_node_style won't always do it
                     )
                     widgetid.insert("1.0", chars=alt)
                     self.handle_node_replacement(
@@ -1005,16 +1005,14 @@ If you benefited from using this package, please consider supporting its develop
                     )
                     widgetid.configure(height=int(widgetid.index('end').split('.')[0])-1)
                     widgetid["state"] = "disabled"
+                    del self.loaded_images[name]
 
         elif not self.ignore_invalid_images:
-            image = imageutils.data_to_image(utilities.BROKEN_IMAGE, name, "image/png", self._image_inversion_enabled, self.dark_theme_limit)
-        else:
-            return
-        
-        if name in self.loaded_images:
-            self.loaded_images[name] = (self.loaded_images[name], image)
-        else:
-            self.loaded_images[name] = image
+            image = data_to_image(BROKEN_IMAGE, name, "image/png", self._image_inversion_enabled, self.dark_theme_limit)
+            if name in self.loaded_images:
+                self.loaded_images[name] = (self.loaded_images[name], image)
+            else:
+                self.loaded_images[name] = image
 
     def fetch_images(self, node, url, name):
         "Fetch images and display them in the document."
