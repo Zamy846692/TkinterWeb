@@ -1005,7 +1005,6 @@ If you benefited from using this package, please consider supporting its develop
                     )
                     widgetid.configure(height=int(widgetid.index('end').split('.')[0])-1)
                     widgetid["state"] = "disabled"
-                    del self.loaded_images[name]
 
         elif not self.ignore_invalid_images:
             image = data_to_image(BROKEN_IMAGE, name, "image/png", self._image_inversion_enabled, self.dark_theme_limit)
@@ -1069,10 +1068,6 @@ If you benefited from using this package, please consider supporting its develop
             self.on_resource_setup(url, "image", True)
             if node:
                 self._post_element_event(node, "onload", None, utilities.ELEMENT_LOADED_EVENT)
-            #if self.experimental:
-            #    node = self.search(f'img[src="{url}"]')
-            #    if node:
-            #        if self.get_node_children(node): self.delete_node(self.get_node_children(node))
             if name in self.loaded_images:
                 self.loaded_images[name] = (self.loaded_images[name], image)
             else:
@@ -1087,6 +1082,7 @@ If you benefited from using this package, please consider supporting its develop
 
     def _on_image_error(self, url, name, error):
         # NOTE: this must run in the main thread
+        self._finish_image_delete(name)
         self.post_message(error)
         self.load_alt_text(url, name)
         self.on_resource_setup(url, "image", False)
@@ -1943,9 +1939,6 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
                         del self.image_directory[k]
                         break
             self.image_directory[url] = node
-            # if self.experimental:
-            #     c = self.get_node_children(node)
-            #     if c: self.destroy_node(c)
 
     def _on_image_cmd(self, url):
         "Handle images."
@@ -2846,6 +2839,11 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
             tags = (self.node_tag, self.tkinterweb_tag)
 
         widgetid.bindtags(widgetid.bindtags() + tags)
+
+    @property
+    def images(self):  # Debuging
+        NAMES = ("name", "pixmap", "w", "h", "alpha", "ref",)
+        return {i[0]:dict(zip(NAMES, i[1:])) for i in self.tk.call(self._w, "_images")}
 
     def tkhtml_uri_decode(self, uri, base64=False):
         "This command is designed to help scripts process data: URIs. It is completely separate from the html widget"
