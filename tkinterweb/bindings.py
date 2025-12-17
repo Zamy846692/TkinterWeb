@@ -1082,7 +1082,7 @@ If you benefited from using this package, please consider supporting its develop
 
     def _on_image_error(self, url, name, error):
         # NOTE: this must run in the main thread
-        self._finish_image_delete(name)
+        self._on_image_delete(name)
         self.post_message(error)
         self.load_alt_text(url, name)
         self.on_resource_setup(url, "image", False)
