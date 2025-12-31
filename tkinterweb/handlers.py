@@ -621,9 +621,6 @@ class ImageManager(utilities.BaseManager):
                         del self.image_directory[k]
                         break
             self.image_directory[url] = node
-            # if self.html.experimental:
-            #     c = self.html.get_node_children(node)
-            #     if c: self.html.destroy_node(c)
 
     def load_alt_text(self, url, name):
         # NOTE: this must run in the main thread
@@ -642,7 +639,7 @@ class ImageManager(utilities.BaseManager):
                             font=self.html.get_node_property(node, "font")  # Needs to be forced to work as handle_node_style won't always do it
                         )
                         widgetid.insert("1.0", chars=alt)
-                        self.html.handle_node_replacement(
+                        self.html.widget_manager.handle_node_replacement(
                             node, widgetid,
                             lambda widgetid=widgetid: self.html.widget_manager._handle_node_removal(widgetid),
                             lambda node=node, widgetid=widgetid, widgettype="text": self.html.widget_manager._handle_node_style(
@@ -746,10 +743,6 @@ class ImageManager(utilities.BaseManager):
             self.html.on_resource_setup(url, "image", True)
             if node:
                 self.html.event_manager.post_element_event(node, "onload", None, utilities.ELEMENT_LOADED_EVENT)
-            #if self.html.experimental:
-            #    node = self.html.search(f'img[src="{url}"]')
-            #    if node:
-            #        if self.html.get_node_children(node): self.html.delete_node(self.html.get_node_children(node))
             if name in self.loaded_images:
                 self.loaded_images[name] = (self.loaded_images[name], image)
             else:
