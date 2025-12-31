@@ -7,7 +7,7 @@ Copyright (c) 2021-2025 Andrew Clarke
 
 from . import bindings, dom, js, utilities, subwidgets, imageutils
 
-from urllib.parse import urldefrag, urlparse, urlunparse
+from urllib.parse import urldefrag, urlparse, urlunparse, urljoin
 
 import tkinter as tk
 from tkinter.ttk import Frame, Style
@@ -502,6 +502,8 @@ class HtmlFrame(Frame):
         # Set the base url now in case it takes a while for the website to download
         self._html.base_url = url
 
+        if url.startswith("mailto"): return  # Don't try to load emails!
+
         if self._thread_in_progress:
             self._thread_in_progress.stop()
         if self._html.threading_enabled:
@@ -606,6 +608,15 @@ class HtmlFrame(Frame):
             self._accumulated_styles.append(css_source)
         else:
             self._html.parse_css(data=css_source)
+
+    def import_css(self, url):
+        try:
+            new_url = urljoin(self._html.base_url, url)
+            self._html.post_message(f"Loading stylesheet from {new_url}")
+            self._html._thread_check(self._html.fetch_styles, url=new_url)
+
+        except Exception as error:
+            self._html.post_message(f"ERROR: could not load stylesheet {url}: {error}")
 
     def stop(self):
         """Stop loading this page and abandon all pending requests."""
@@ -1432,25 +1443,44 @@ class HtmlText(HtmlFrame):
 
     ### TODO: add more methods
 
-class HtmlParse(HtmlFrame):
+class HtmlParse():
     """The :class:`HtmlParse` class parses HTML but does not spawn a widget. It inherits from the :class:`HtmlFrame` class. 
     
     For a complete list of avaliable methods, properties, configuration options, and generated events, see the :class:`HtmlFrame` docs.
     
     New in version 4.4."""
-    def __init__(self, **kwargs):
+    def __init__(self, markup="", **kwargs):
         self.root = root = tk.Tk()
-
-        self._is_destroying = False
-
-        for flag in ["events_enabled", "images_enabled", "forms_enabled"]:
-            if flag not in kwargs:
-                kwargs[flag] = False
-                
-        HtmlFrame.__init__(self, root, **kwargs)
-
         root.withdraw()
 
+        for flag in ["events_enabled", "images_enabled", "forms_enabled", "stylesheets_enabled"]:
+            if flag not in kwargs:
+                kwargs[flag] = False
+
+        if "headers" not in kwargs: kwargs["headers"] = HEADERS
+
+        self.root = root = tk.Tk()
+        self.html = html = TkinterWeb(root, kwargs)
+        self.document = HTMLDocument(html)
+
+        if markup:
+            if os.path.isfile(markup):
+                markup = "file:///" + markup
+                markup, url, file, r = download(
+                    markup, headers=tuple(self.html.headers.items())
+                )
+
+            else:
+                parsed = urlparse(markup)
+                if parsed.scheme in frozenset({"https", "http"}):
+                    markup, url, file, r = cache_download(
+                        markup, headers=tuple(self.html.headers.items())
+                    )
+
+            html.parse(markup)
+
+    def __str__(self):
+        return f"<html>{self.document.documentElement.innerHTML}</html>"
+
     def destroy(self):
-        super().destroy()
         self.root.destroy()

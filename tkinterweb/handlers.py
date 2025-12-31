@@ -636,36 +636,30 @@ class ImageManager(utilities.BaseManager):
                 try:  # Ensure thread safety when closing
                     alt = self.html.get_node_attribute(node, "alt")
                     if alt:
-                        ### Should work, but doesn't
-                        #if self.html.experimental: 
-                        #    # Insert the parsed fragment directly if in experimental mode
-                        #    self.html.insert_node(node, self.html.parse_fragment(alt))
-                        #else:
+                        widgetid = tk.Text(
+                            self.html, bd=0, width=len(alt)+1,
+                            highlightbackground="white", highlightthickness=1,
+                            font=self.html.get_node_property(node, "font")  # Needs to be forced to work as handle_node_style won't always do it
+                        )
+                        widgetid.insert("1.0", chars=alt)
+                        self.html.handle_node_replacement(
+                            node, widgetid,
+                            lambda widgetid=widgetid: self.html.widget_manager._handle_node_removal(widgetid),
+                            lambda node=node, widgetid=widgetid, widgettype="text": self.html.widget_manager._handle_node_style(
+                                node, widgetid, widgettype
+                            ),
+                        )
+                        widgetid.configure(height=int(widgetid.index('end').split('.')[0])-1)
+                        widgetid["state"] = "disabled"
 
-                        # Generate an image with alternate text if not in experimental mode
-                        try:
-                            image = imageutils.text_to_image(
-                                name, alt, self.html.bbox(node),
-                                self.image_alternate_text_font,
-                                self.image_alternate_text_size,
-                                self.image_alternate_text_threshold,
-                            )
-                        except (ImportError, ModuleNotFoundError,):
-                            self.html.post_message(f"ERROR: could not display alternate text for the image {url}: PIL and PIL.ImageTk must be installed")
-                            return
-                    else:
-                        return
                 except (RuntimeError, tk.TclError): 
                     return  # Widget no longer exists
-        elif not self.html.ignore_invalid_images:
-            image = imageutils.data_to_image(utilities.BROKEN_IMAGE, name, "image/png", self.html.image_inversion_enabled, self.html.dark_theme_limit)
-        else:
-            return
-        
-        if name in self.loaded_images:
-            self.loaded_images[name] = (self.loaded_images[name], image)
-        else:
-            self.loaded_images[name] = image
+        elif not self.ignore_invalid_images:
+            image = data_to_image(BROKEN_IMAGE, name, "image/png", self._image_inversion_enabled, self.dark_theme_limit)
+            if name in self.loaded_images:
+                self.loaded_images[name] = (self.loaded_images[name], image)
+            else:
+                self.loaded_images[name] = image
 
     def _on_image_cmd(self, url):
         "Handle images."
@@ -770,6 +764,7 @@ class ImageManager(utilities.BaseManager):
 
     def _on_image_error(self, url, name, error):
         # NOTE: this must run in the main thread
+        self._on_image_delete(name)
         self.html.post_message(error)
         self.load_alt_text(url, name)
         self.html.on_resource_setup(url, "image", False)
