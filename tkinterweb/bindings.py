@@ -2142,12 +2142,12 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
                 self.post_message(f"Tkhtml {loaded_version} successfully loaded")
 
     def _requestcmd(self, handle):
+        "Fetch any requests made by Hv3"
         uri = self.tk.call(handle, "cget", "-uri")
         head_str = " ".join(f"{k} {{{v}}}" for k, v in self.headers.items())
         self.tk.call(handle, "configure", "-header", head_str)
-        header = self.tk.call(handle, "cget", "-header")
         kw = dict(
-            url=uri, insecure=False, headers=tuple(zip(header[::2], header[1::2]))
+            url=uri, insecure=False, headers=tuple(self.headers.items())
         )
         parsed = self.tk.call("::tkhtml::uri", uri)
         if self.tk.call(parsed, "scheme") == "file":
@@ -2156,6 +2156,7 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
             data = (self.tk.call(parsed, "path").lstrip("/"),)
         else:
             data = utilities.cache_download(**kw)
+            
         self.tk.call(handle, "finish", data[0])
         self.tk.call(parsed, "destroy")
 
