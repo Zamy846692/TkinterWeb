@@ -2071,7 +2071,7 @@ class TkinterHv3(tk.Widget):
         self._load_tkhtml()
 
         if "headers" in kwargs: self.headers = kwargs.pop("headers")
-        else: self.headers = HEADERS
+        else: self.headers = utilities.HEADERS
 
         master.tk.eval("set auto_path [linsert $auto_path 0 %s]" % hv)
         master.tk.eval("package require snit")
@@ -2080,7 +2080,7 @@ class TkinterHv3(tk.Widget):
         if "requestcmd" not in kwargs:
             kwargs["requestcmd"] = master.register(self._requestcmd)
             
-        Widget.__init__(self, master, "::hv3::hv3", kwargs)
+        tk.Widget.__init__(self, master, "::hv3::hv3", kwargs)
         self.focus_set()
 
     def _setup_settings(self):
@@ -2095,7 +2095,7 @@ class TkinterHv3(tk.Widget):
         self.tkhtml_version = ""
         self.experimental = False
 
-        self.message_func = placeholder
+        self.message_func = utilities.placeholder
         
     def post_message(self, message):
         "Post a message."
@@ -2110,7 +2110,7 @@ class TkinterHv3(tk.Widget):
         try:
             loaded_version = tkinterweb_tkhtml.get_loaded_tkhtml_version(self.master)
             self.post_message(f"Using Tkhtml {loaded_version} because it is already loaded")
-        except TclError:
+        except tk.TclError:
             if self.use_prebuilt_tkhtml:
                 try:
                     file, loaded_version, self.experimental = tkinterweb_tkhtml.get_tkhtml_file(self.tkhtml_version, experimental=self.experimental)
@@ -2140,11 +2140,11 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
         )
         parsed = self.tk.call("::tkhtml::uri", uri)
         if self.tk.call(parsed, "scheme") == "file":
-            data = download(**kw)
+            data = utilities.download(**kw)
         elif self.tk.call(parsed, "scheme") == "home":
             data = (self.tk.call(parsed, "path").lstrip("/"),)
         else:
-            data = cache_download(**kw)
+            data = utilities.cache_download(**kw)
         self.tk.call(handle, "finish", data[0])
         self.tk.call(parsed, "destroy")
 
