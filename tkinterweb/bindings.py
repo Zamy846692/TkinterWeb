@@ -2070,6 +2070,7 @@ class TkinterHv3(tk.Widget):
 
         self._load_tkhtml()
 
+        # 'hv' is the directory of the Html Viewer 3 (Hv3) installation
         master.tk.eval("set auto_path [linsert $auto_path 0 %s]" % hv)
         master.tk.eval("package require snit")
         master.tk.eval("package require hv3")
@@ -2143,12 +2144,12 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
 
     def _requestcmd(self, handle):
         "Fetch any requests made by Hv3"
-        uri = self.tk.call(handle, "cget", "-uri")
-        head_str = " ".join(f"{k} {{{v}}}" for k, v in self.headers.items())
-        self.tk.call(handle, "configure", "-header", head_str)
-        kw = dict(
-            url=uri, insecure=False, headers=tuple(self.headers.items())
-        )
+        uri = self.tk.call(handle, "cget", "-uri") # Get URI of the request
+        # Specify download parameters and set the headers for the underlying Tk/Hv3 widget
+        kw = dict(url=uri, insecure=False, headers=tuple(self.headers.items()))
+        self.tk.call(handle, "configure", "-header", kw["headers"])
+
+        # Parse the URI to find the correct way to load the request
         parsed = self.tk.call("::tkhtml::uri", uri)
         if self.tk.call(parsed, "scheme") == "file":
             data = utilities.download(**kw)
@@ -2156,35 +2157,44 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
             data = (self.tk.call(parsed, "path").lstrip("/"),)
         else:
             data = utilities.cache_download(**kw)
-            
+
+        # Clean-up paraphernalia left in the memory
         self.tk.call(handle, "finish", data[0])
         self.tk.call(parsed, "destroy")
 
     def goto(self, url):
+        "Load the content at the specified URI into the widget."
         self.tk.call(self._w, "goto", url)
 
     def stop(self):
+        "Cancel all pending downloads."
         self.tk.call(self._w, "stop")
 
     def reset(self):
+        "Wrapper around the html widget command of the same name. Also resets all document related state stored by the mega-widget."
         self.tk.call(self._w, "reset")
 
     @property
     def node(self):
+        "Caching wrapper around html widget [node] command."
         return self.tk.call(self._w, "node")
 
     @property
     def html(self):
+        "Return the path of the underlying html widget."
         return self.tk.call(self._w, "html")
 
     @property
     def title(self):
+        "Return the "title" of the currently loaded document."
         return self.tk.call(self._w, "title")
 
     @property
     def location(self):
+        "Return the location URI of the widget."
         return self.tk.call(self._w, "location")
 
     @property
     def selected(self):
+        "Return the currently selected text, or an empty string if no text is currently selected."
         return self.tk.call(self._w, "selected")
