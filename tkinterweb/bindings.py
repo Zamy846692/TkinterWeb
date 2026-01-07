@@ -1880,7 +1880,7 @@ class TkinterHv3(tk.Widget):
             "tkhtml_version": "",
             "experimental": False,
 
-            "message_func": utilities.placeholder,
+            "message_func": utilities.notifier,
 
             "headers": utilities.HEADERS,
         }
@@ -1936,6 +1936,8 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
             data = (self.tk.call(parsed, "path").lstrip("/"),)
         else:
             data = utilities.cache_download(**kw)
+
+        self.post_message(f"Fetched {self.tk.call(handle, 'cget', '-mimetype')} from {utilities.shorten(uri)}")
 
         # Clean-up paraphernalia left in the memory
         self.tk.call(handle, "finish", data[0])
