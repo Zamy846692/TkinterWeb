@@ -651,7 +651,7 @@ class ImageManager(utilities.BaseManager):
 
                 except (RuntimeError, tk.TclError): 
                     return  # Widget no longer exists
-        elif not self.ignore_invalid_images:
+        elif not self.html.ignore_invalid_images:
             image = data_to_image(BROKEN_IMAGE, name, "image/png", self._image_inversion_enabled, self.dark_theme_limit)
             if name in self.loaded_images:
                 self.loaded_images[name] = (self.loaded_images[name], image)
