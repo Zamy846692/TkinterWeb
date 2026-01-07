@@ -2071,7 +2071,7 @@ class TkinterHv3(tk.Widget):
         self._load_tkhtml()
 
         # 'hv' is the directory of the Html Viewer 3 (Hv3) installation
-        master.tk.eval("set auto_path [linsert $auto_path 0 %s]" % hv)
+        master.tk.eval(f"set auto_path [linsert $auto_path 0 {hv}]")
         master.tk.eval("package require snit")
         master.tk.eval("package require hv3")
 
@@ -2162,9 +2162,14 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
         self.tk.call(handle, "finish", data[0])
         self.tk.call(parsed, "destroy")
 
-    def goto(self, url):
-        "Load the content at the specified URI into the widget."
-        self.tk.call(self._w, "goto", url)
+    def goto(self, url, cnf={}, **kw):
+        """Load the content at the specified URI into the widget.
+        Supported options are:
+           cachecontrol "normal"|"relax-transparency"|"no-cache"
+           nosave
+           referer URI
+           history_handle  DOWNLOAD-HANDLE"""
+        self.tk.call((self._w, "goto", url)+self._options(cnf, kw))
 
     def stop(self):
         "Cancel all pending downloads."
@@ -2174,19 +2179,34 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
         "Wrapper around the html widget command of the same name. Also resets all document related state stored by the mega-widget."
         self.tk.call(self._w, "reset")
 
-    @property
-    def node(self):
+    def node(self, *args):
         "Caching wrapper around html widget [node] command."
-        return self.tk.call(self._w, "node")
+        nodes = self.tk.call(self._w, "node", *args)
+        if nodes:
+            return nodes
+        else:
+            return None, None
+
+    def html(self, *args):
+        "Return the path of the underlying html widget."
+        return self.tk.call(self._w, "html", *args)
+
+    def xview(self, *args):
+        "Used to control horizontal scrolling."
+        return self.tk.call(self._w, "xview", *args)
+
+    def yview(self, *args):
+        "Used to control vertical scrolling."
+        return self.tk.call(self._w, "yview", *args)
 
     @property
-    def html(self):
-        "Return the path of the underlying html widget."
-        return self.tk.call(self._w, "html")
+    def pending(self):
+        "Number of active handles"
+        return self.tk.call(self._w, "pending")
 
     @property
     def title(self):
-        "Return the "title" of the currently loaded document."
+        "Return the 'title' of the currently loaded document."
         return self.tk.call(self._w, "title")
 
     @property
