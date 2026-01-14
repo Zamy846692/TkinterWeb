@@ -757,7 +757,6 @@ class ImageManager(utilities.BaseManager):
 
     def _on_image_error(self, url, name, error):
         # NOTE: this must run in the main thread
-        self._on_image_delete(name)
         self.html.post_message(error)
         self.load_alt_text(url, name)
         self.html.on_resource_setup(url, "image", False)
