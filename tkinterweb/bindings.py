@@ -1924,6 +1924,7 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
     def _requestcmd(self, handle):
         "Fetch any requests made by Hv3"
         uri = self.tk.call(handle, "cget", "-uri") # Get URI of the request
+        # TODO: make it asynchronous
         # Specify download parameters and set the headers for the underlying Tk/Hv3 widget
         kw = dict(url=uri, insecure=False, headers=tuple(self.headers.items()))
         self.tk.call(handle, "configure", "-header", kw["headers"])
@@ -1940,7 +1941,7 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
         self.post_message(f"Fetched {self.tk.call(handle, 'cget', '-mimetype')} from {utilities.shorten(uri)}")
 
         # Clean-up paraphernalia left in the memory
-        self.tk.call(handle, "finish", data[0])
+        self.tk.call(handle, "finish", data[1])
         self.tk.call(parsed, "destroy")
 
     def goto(self, url, cnf={}, **kw):
