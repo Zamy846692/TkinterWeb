@@ -2029,6 +2029,21 @@ class Hv3Request():
         self.request = request
         self._hv3 = hv
 
+    def __del__(self):
+        self.finish()
+
+    def authority(self):
+        "Return the 'authority' part of the URI configured as the -uri option."
+        return self._hv3.tk.call(self.request, "authority")
+
+    def append(self, raw):
+        "Interface for returning data."
+        self._hv3.tk.call(self.request, "append", raw)
+
+    def finish(self, raw=""):
+        "Called after all data has been passed to [append]."
+        self._hv3.tk.call(self.request, "append", raw)
+
     def configure(self, cnf=None, **kw):
         if kw: cnf = tk._cnfmerge((cnf, kw))
         elif cnf: cnf = tk._cnfmerge(cnf)
@@ -2048,7 +2063,7 @@ class Hv3Request():
     config = configure
 
     def cget(self, key):
-        """Return the resource value for a KEY given as string."""
+        "Return the resource value for a KEY given as string."
         return self._hv3.tk.call(self.request, 'cget', '-' + key)
 
     __getitem__ = cget
