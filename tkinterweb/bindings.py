@@ -1845,6 +1845,7 @@ class TkinterHv3(tk.Widget):
 
     def __init__(self, master, hv, **kwargs):
         self.master = master
+        self.active_threads = []
         self._setup_settings(kwargs)
 
         self._load_tkhtml()
@@ -1880,23 +1881,22 @@ class TkinterHv3(tk.Widget):
             "tkhtml_version": "",
             "experimental": False,
 
+            "maximum_thread_count": 20,
+
             "message_func": utilities.notifier,
 
             "headers": utilities.HEADERS,
         }
         settings.update(options)
-        for key, value in settings.items():
-            setattr(self, key, value)
+        for key, value in settings.items(): setattr(self, key, value)
         
     def post_message(self, message):
         "Post a message."
-        if self.messages_enabled:
-            self.message_func(message)
+        if self.messages_enabled: self.message_func(message)
 
     def _load_tkhtml(self):
         "Load Tkhtml"
-        if self.tkhtml_version == "auto":
-            self.tkhtml_version = None
+        if self.tkhtml_version == "auto": self.tkhtml_version = None
 
         try:
             loaded_version = tkinterweb_tkhtml.get_loaded_tkhtml_version(self.master)
@@ -1921,13 +1921,25 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
                 loaded_version = tkinterweb_tkhtml.get_loaded_tkhtml_version(self.master)
                 self.post_message(f"Tkhtml {loaded_version} successfully loaded")
 
+    def _thread_check(self, callback, *args, **kwargs):
+        if not self.allow_threading:
+            callback(*args, **kwargs)
+        elif len(self.active_threads) >= self.maximum_thread_count:
+            self.after(500, lambda callback=callback, args=args: self._thread_check(callback, *args, **kwargs))
+        else:
+            thread = utilities.StoppableThread(target=callback, args=args, kwargs=kwargs)
+            thread.start()
+
     def _requestcmd(self, handle):
         "Fetch any requests made by Hv3"
         uri = self.tk.call(handle, "cget", "-uri") # Get URI of the request
-        # TODO: make it asynchronous
+        self._thread_check(self.fetch_request, handle, uri)
+        self.post_message(f"Fetching {self.tk.call(handle, 'cget', '-mimetype')} from {utilities.shorten(uri)}")
+
+    def fetch_request(self, handle, uri):
         # Specify download parameters and set the headers for the underlying Tk/Hv3 widget
         kw = dict(url=uri, insecure=False, headers=tuple(self.headers.items()))
-        self.tk.call(handle, "configure", "-header", kw["headers"])
+        self.tk.call(handle, "configure", "-header", dict(kw["headers"]))
 
         # Parse the URI to find the correct way to load the request
         parsed = self.tk.call("::tkhtml::uri", uri)
