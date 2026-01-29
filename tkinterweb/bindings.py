@@ -2013,3 +2013,33 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
     def selected(self):
         "Return the currently selected text, or an empty string if no text is currently selected."
         return self.tk.call(self._w, "selected")
+
+class Hv3Request():
+    """Instances of this class are used to interface between the protocol implementation and the hv3 widget."""
+    def __init__(self, request, hv):
+        self.request = request
+        self._hv3 = hv
+
+    def configure(self, cnf=None, **kw):
+        if kw: cnf = tk._cnfmerge((cnf, kw))
+        elif cnf: cnf = tk._cnfmerge(cnf)
+        if cnf is None:
+            cnf = {}
+            for x in self._hv3.tk.splitlist(self.tk.call(*args)):
+                x = self._hv3.tk.splitlist(x)
+                cnf[x[0][1:]] = (x[0][1:],) + x[1:]
+            return cnf
+        if isinstance(cnf, str):
+            x = self._hv3.tk.splitlist(self._hv3.tk.call(*args))
+            return (x[0][1:],) + x[1:]
+        self._hv3.tk.call(tk._flatten((self.request, 'configure'))+self._hv3._options(cnf))
+
+    def __setitem__(self, k, v): self.configure({k: v})
+
+    config = configure
+
+    def cget(self, key):
+        """Return the resource value for a KEY given as string."""
+        return self._hv3.tk.call(self.request, 'cget', '-' + key)
+
+    __getitem__ = cget
