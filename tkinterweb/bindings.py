@@ -1887,8 +1887,9 @@ class TkinterHv3(tk.Widget):
 
             "headers": utilities.HEADERS,
         }
-        settings.update(options)
-        for key, value in settings.items(): setattr(self, key, value)
+        for key, value in settings.items():
+            if key in options: value = options.pop(key)
+            setattr(self, key, value)
         
     def post_message(self, message):
         "Post a message."
@@ -1939,21 +1940,21 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
     def fetch_request(self, handle, uri):
         # Specify download parameters and set the headers for the underlying Tk/Hv3 widget
         kw = dict(url=uri, insecure=False, headers=tuple(self.headers.items()))
-        self.tk.call(handle, "configure", "-header", dict(kw["headers"]))
+        self.tk.call(handle, "configure", "-header", kw["headers"])
 
         # Parse the URI to find the correct way to load the request
         parsed = self.tk.call("::tkhtml::uri", uri)
         if self.tk.call(parsed, "scheme") == "file":
-            data = utilities.download(**kw)
+            data = utilities.download(**kw)[1]
         elif self.tk.call(parsed, "scheme") == "home":
-            data = (self.tk.call(parsed, "path").lstrip("/"),)
+            data = self.tk.call(parsed, "path").lstrip("/")
         else:
-            data = utilities.cache_download(**kw)
+            data = utilities.cache_download(**kw)[1]
 
         self.post_message(f"Fetched {self.tk.call(handle, 'cget', '-mimetype')} from {utilities.shorten(uri)}")
 
         # Clean-up paraphernalia left in the memory
-        self.tk.call(handle, "finish", data[1])
+        self.tk.call(handle, "finish", data)
         self.tk.call(parsed, "destroy")
 
     def goto(self, url, cnf={}, **kw):
