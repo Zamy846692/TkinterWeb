@@ -1862,7 +1862,7 @@ class TkinterHv3(tk.Widget):
         # Provide OS information for troubleshooting
         self.post_message(f"Starting TkinterHv3 for {utilities.PLATFORM.processor} {utilities.PLATFORM.system} with Python {'.'.join(utilities.PYTHON_VERSION)}")
 
-        # Load and initialize the Tkhtml3 widget
+        # Load and initialize the Hv3 widget
         tk.Widget.__init__(self, master, "::hv3::hv3", kwargs)
         self.focus_set()
 
@@ -1963,12 +1963,13 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
 
             self.post_message(f"Fetched {mimetype} from {utilities.shorten(uri)}")
 
-            # Clean-up paraphernalia left in the memory
             handle.append(data)
-            self.tk.call(parsed, "destroy")
+            
         except Exception as error:
             self.post_message(f"ERROR: could not load {mimetype} {uri}: {error}")
 
+        # Clean-up paraphernalia left in the memory
+        self.tk.call(parsed, "destroy")
         self.active_threads.remove(thread)
 
     def goto(self, url, *a, cnf={}, **kw):
@@ -2036,7 +2037,8 @@ class Hv3Request():
         self.tk = master.tk
 
     def __del__(self):
-        self.finish()
+        "Called after all data has been passed to [append]."
+        self.tk.call(self.request, "finish")
 
     @property
     def authority(self):
@@ -2046,10 +2048,6 @@ class Hv3Request():
     def append(self, raw):
         "Interface for returning data."
         self.tk.call(self.request, "append", raw)
-
-    def finish(self, raw=""):
-        "Called after all data has been passed to [append]."
-        self.tk.call(self.request, "finish", raw)
 
     def configure(self, cnf=None, **kw):
         if kw: cnf = tk._cnfmerge((cnf, kw))
