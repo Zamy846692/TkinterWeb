@@ -1936,18 +1936,20 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
 
     def _requestcmd(self, handle):
         "Fetch any requests made by Hv3"
-        uri = self.tk.call(handle, "cget", "-uri") # Get URI of the request
-        self._thread_check(self.fetch_request, handle, uri)
-        self.post_message(f"Fetching {self.tk.call(handle, 'cget', '-mimetype')} from {utilities.shorten(uri)}")
+        request = Hv3Request(handle, self) # Embed the Tcl request command in the python class
+        self._thread_check(self.fetch_request, request)
+        self.post_message(f"Fetching {request['mimetype']} from {utilities.shorten(request['uri'])}")
 
-    def fetch_request(self, handle, uri):
+    def fetch_request(self, handle):
         thread = utilities.get_current_thread()
         self.active_threads.append(thread)
+
+        uri = handle["uri"] # Get URI of the request
         
         # Specify download parameters and set the headers for the underlying Tk/Hv3 widget
         kw = dict(url=uri, insecure=False, headers=tuple(self.headers.items()))
-        self.tk.call(handle, "configure", "-header", kw["headers"])
-        mimetype = self.tk.call(handle, 'cget', '-mimetype')
+        handle.configure(header=kw["headers"])
+        mimetype = handle["mimetype"]
 
         try:
             # Parse the URI to find the correct way to load the request
@@ -1962,7 +1964,7 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
             self.post_message(f"Fetched {mimetype} from {utilities.shorten(uri)}")
 
             # Clean-up paraphernalia left in the memory
-            self.tk.call(handle, "finish", data)
+            handle.append(data)
             self.tk.call(parsed, "destroy")
         except Exception as error:
             self.post_message(f"ERROR: could not load {mimetype} {uri}: {error}")
@@ -2028,38 +2030,40 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
 
 class Hv3Request():
     """Instances of this class are used to interface between the protocol implementation and the hv3 widget."""
-    def __init__(self, request, hv):
+    def __init__(self, request, master):
         self.request = request
-        self._hv3 = hv
+        self._options = master._options
+        self.tk = master.tk
 
     def __del__(self):
         self.finish()
 
+    @property
     def authority(self):
         "Return the 'authority' part of the URI configured as the -uri option."
-        return self._hv3.tk.call(self.request, "authority")
+        return self.tk.call(self.request, "authority")
 
     def append(self, raw):
         "Interface for returning data."
-        self._hv3.tk.call(self.request, "append", raw)
+        self.tk.call(self.request, "append", raw)
 
     def finish(self, raw=""):
         "Called after all data has been passed to [append]."
-        self._hv3.tk.call(self.request, "append", raw)
+        self.tk.call(self.request, "finish", raw)
 
     def configure(self, cnf=None, **kw):
         if kw: cnf = tk._cnfmerge((cnf, kw))
         elif cnf: cnf = tk._cnfmerge(cnf)
         if cnf is None:
             cnf = {}
-            for x in self._hv3.tk.splitlist(self.tk.call(*args)):
-                x = self._hv3.tk.splitlist(x)
+            for x in self.tk.splitlist(self.tk.call(*args)):
+                x = self.tk.splitlist(x)
                 cnf[x[0][1:]] = (x[0][1:],) + x[1:]
             return cnf
         if isinstance(cnf, str):
-            x = self._hv3.tk.splitlist(self._hv3.tk.call(*args))
+            x = self.tk.splitlist(self.tk.call(*args))
             return (x[0][1:],) + x[1:]
-        self._hv3.tk.call(tk._flatten((self.request, 'configure'))+self._hv3._options(cnf))
+        self.tk.call(tk._flatten((self.request, 'configure'))+self._options(cnf))
 
     def __setitem__(self, k, v): self.configure({k: v})
 
@@ -2067,6 +2071,6 @@ class Hv3Request():
 
     def cget(self, key):
         "Return the resource value for a KEY given as string."
-        return self._hv3.tk.call(self.request, 'cget', '-' + key)
+        return self.tk.call(self.request, 'cget', '-' + key)
 
     __getitem__ = cget
