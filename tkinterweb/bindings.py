@@ -1922,6 +1922,9 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
                 loaded_version = tkinterweb_tkhtml.get_loaded_tkhtml_version(self.master)
                 self.post_message(f"Tkhtml {loaded_version} successfully loaded")
 
+        self.tkhtml_version = float(loaded_version)
+        self.using_tkhtml30 = float(loaded_version) == 3
+
     def _thread_check(self, callback, *args, **kwargs):
         if not self.allow_threading:
             callback(*args, **kwargs)
@@ -1966,14 +1969,14 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
 
         self.active_threads.remove(thread)
 
-    def goto(self, url, cnf={}, **kw):
+    def goto(self, url, *a, cnf={}, **kw):
         """Load the content at the specified URI into the widget.
         Supported options are:
            cachecontrol "normal"|"relax-transparency"|"no-cache"
            nosave
            referer URI
            history_handle  DOWNLOAD-HANDLE"""
-        self.tk.call((self._w, "goto", url)+self._options(cnf, kw))
+        self.tk.call((self._w, "goto", url)+utilities.TclOpt(a)+self._options(cnf, kw))
 
     def stop(self):
         "Cancel all pending downloads."
