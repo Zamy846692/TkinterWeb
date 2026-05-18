@@ -1945,25 +1945,26 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
         self.active_threads.append(thread)
 
         uri = handle["uri"] # Get URI of the request
+        # Parse the URI to find the correct way to load the request
+        parsed = self.tk.call("::tkhtml::uri", uri)
         
         # Specify download parameters and set the headers for the underlying Tk/Hv3 widget
         kw = dict(url=uri, insecure=False, headers=tuple(self.headers.items()))
-        handle.configure(header=kw["headers"])
+        handle.configure(requestheader=kw["headers"])
         mimetype = handle["mimetype"]
 
         try:
-            # Parse the URI to find the correct way to load the request
-            parsed = self.tk.call("::tkhtml::uri", uri)
             if self.tk.call(parsed, "scheme") == "file":
-                data = utilities.download(**kw)[1]
+                newurl, data, filetype, code = utilities.download(**kw)
+                handle.configure(uri=newurl)
             elif self.tk.call(parsed, "scheme") == "home":
                 data = self.tk.call(parsed, "path").lstrip("/")
             else:
-                data = utilities.cache_download(**kw)[1]
+                newurl, data, filetype, code = utilities.cache_download(**kw)
+                handle.configure(uri=newurl)
 
-            self.post_message(f"Fetched {mimetype} from {utilities.shorten(uri)}")
-
-            handle.append(data)
+            handle.append(data.encode()) # Pass accumulated URI response back into the Tcl widget. Must be in binary format for this to work
+            self.post_message(f"Fetched {mimetype} from {utilities.shorten(handle['uri'])}")
             
         except Exception as error:
             self.post_message(f"ERROR: could not load {mimetype} {uri}: {error}")
