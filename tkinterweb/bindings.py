@@ -1846,6 +1846,9 @@ class TkinterHv3(tk.Widget):
     def __init__(self, master, hv, **kwargs):
         self.master = master
         self.active_threads = []
+
+        # Setup the settings variables
+        threading = kwargs.pop("threading_enabled", None)
         self._setup_settings(kwargs)
 
         self._load_tkhtml()
@@ -1872,6 +1875,9 @@ class TkinterHv3(tk.Widget):
         except tk.TclError:
             self.allow_threading = True
 
+        if threading is not None:
+            setattr(self, "threading_enabled", threading)
+
     def _setup_settings(self, options):
         "Widget settings."
         settings = {
@@ -1887,9 +1893,9 @@ class TkinterHv3(tk.Widget):
 
             "headers": utilities.HEADERS,
         }
+        settings.update(options)
         for key, value in settings.items():
-            if key in options: value = options.pop(key)
-            setattr(self, key, value)
+            setattr(self, key, options.pop(key, value))
         
     def post_message(self, message):
         "Post a message."
