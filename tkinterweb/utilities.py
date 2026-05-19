@@ -846,7 +846,9 @@ def download(url, data="", method="GET", decode=None, insecure=False, cafile=Non
             maintype = info.maintype
             filetype = info.type
         if (maintype != "image") or ("svg" in filetype):
-            if decode:
+            if decode is False:
+                pass
+            elif decode:
                 data = data.decode(decode, errors="ignore")
             else:
                 data = data.decode(errors="ignore")

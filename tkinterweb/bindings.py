@@ -1952,31 +1952,30 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
 
         uri = handle["uri"] # Get URI of the request
         # Parse the URI to find the correct way to load the request
-        parsed = self.tk.call("::tkhtml::uri", uri)
+        parsed = TkHtmlParsedURI(uri, self)
         
         # Specify download parameters and set the headers for the underlying Tk/Hv3 widget
-        kw = dict(url=uri, insecure=False, headers=tuple(self.headers.items()))
+        kw = dict(url=uri, decode=False, insecure=False, headers=tuple(self.headers.items()))
         handle.configure(requestheader=kw["headers"])
         mimetype = handle["mimetype"]
 
         try:
-            if self.tk.call(parsed, "scheme") == "file":
+            if parsed.scheme == "home":
+                data = parsed.path.lstrip("/")
+            elif parsed.scheme == "file":
                 newurl, data, filetype, code = utilities.download(**kw)
                 handle.configure(uri=newurl)
-            elif self.tk.call(parsed, "scheme") == "home":
-                data = self.tk.call(parsed, "path").lstrip("/")
-            else:
+            elif parsed.scheme == "http" or parsed.scheme == "https":
                 newurl, data, filetype, code = utilities.cache_download(**kw)
                 handle.configure(uri=newurl)
 
-            handle.append(data.encode()) # Pass accumulated URI response back into the Tcl widget. Must be in binary format for this to work
+            handle.append(data) # Pass accumulated URI response back into the Tcl widget. Must be in binary format for this to work
             self.post_message(f"Fetched {mimetype} from {utilities.shorten(handle['uri'])}")
             
         except Exception as error:
             self.post_message(f"ERROR: could not load {mimetype} {uri}: {error}")
 
         # Clean-up paraphernalia left in the memory
-        self.tk.call(parsed, "destroy")
         self.active_threads.remove(thread)
 
     def goto(self, url, *a, cnf={}, **kw):
@@ -2035,6 +2034,27 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
     def selected(self):
         "Return the currently selected text, or an empty string if no text is currently selected."
         return self.tk.call(self._w, "selected")
+    
+    # --- Tkhtml URIs ---------------------------------------------------------
+
+    def decode_uri(self, uri, base64=False):
+        """This command is designed to help scripts process data: URIs. It is completely separate from the html widget.
+        
+        New in version 4.19."""
+        c = ("::tkhtml::decode", "-base64", uri) if base64 else ("::tkhtml::decode", uri)
+        return self.tk.call(*c)
+
+    def encode_uri(self, uri):
+        """Encodes the uri.
+        
+        New in version 4.19."""
+        return self.tk.call("::tkhtml::encode", uri)
+
+    def escape_uri(self, uri, query=False):
+        """Returns the decoded data.
+        
+        New in version 4.19."""
+        return self.tk.call("::tkhtml::escape_uri", "-query" if query else "", uri)
 
 class Hv3Request():
     """Instances of this class are used to interface between the protocol implementation and the hv3 widget."""
