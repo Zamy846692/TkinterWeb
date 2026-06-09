@@ -1998,6 +1998,7 @@ class HtmlText(HtmlFrame):
         self.configure(**kwargs)
 
 
+from os.path import isfile
 class HtmlParse():
     """The :class:`HtmlParse` class parses HTML but does not spawn a widget. It inherits from the :class:`HtmlFrame` class. 
     
@@ -2008,29 +2009,45 @@ class HtmlParse():
         self.root = root = tk.Tk()
         root.withdraw()
 
-        for flag in ["events_enabled", "images_enabled", "forms_enabled", "stylesheets_enabled"]:
-            if flag not in kwargs:
-                kwargs[flag] = False
+        self._tkinterweb_options = {
+            "message_func": kwargs.pop("message_func", utilities.notifier), "messages_enabled": kwargs.pop("messages_enabled", True),
+            "caret_browsing_enabled": kwargs.pop("caret_browsing_enabled", False), "selection_enabled": kwargs.pop("selection_enabled", True),
+            "stylesheets_enabled": kwargs.pop("stylesheets_enabled", True), "images_enabled": kwargs.pop("images_enabled", True),
+            "forms_enabled": kwargs.pop("forms_enabled", True), "objects_enabled": kwargs.pop("objects_enabled", True),
+            "caches_enabled": kwargs.pop("caches_enabled", True), "dark_theme_enabled": kwargs.pop("dark_theme_enabled", False),
+            "image_inversion_enabled": kwargs.pop("image_inversion_enabled", False), "crash_prevention_enabled": kwargs.pop("crash_prevention_enabled", True),
+            "events_enabled": kwargs.pop("events_enabled", True), "threading_enabled": kwargs.pop("threading_enabled", True),
+            "javascript_enabled": kwargs.pop("javascript_enabled", False), "image_alternate_text_enabled": kwargs.pop("image_alternate_text_enabled", True),
+            "ignore_invalid_images": kwargs.pop("ignore_invalid_images", True), "visited_links": kwargs.pop("visited_links", []),
 
-        if "headers" not in kwargs: kwargs["headers"] = HEADERS
+            "find_match_highlight_color": kwargs.pop("find_match_highlight_color", "#f1a1f7"), "find_match_text_color": kwargs.pop("find_match_text_color", "#000"),
+            "find_current_highlight_color": kwargs.pop("find_current_highlight_color", "#8bf0b3"), "find_current_text_color": kwargs.pop("find_current_text_color", "#000"),
+            "selected_text_highlight_color": kwargs.pop("selected_text_highlight_color", "#9bc6fa"), "selected_text_color": kwargs.pop("selected_text_color", "#000"),
+            "default_style": kwargs.pop("default_style", utilities.DEFAULT_STYLE), "dark_style": kwargs.pop("dark_style", utilities.DARK_STYLE),
+
+            "request_func": kwargs.pop("request_func", None), "insecure_https": kwargs.pop("insecure_https", False),
+            "ssl_cafile": kwargs.pop("ssl_cafile", None), "request_timeout": kwargs.pop("request_timeout", 15),
+            "headers": kwargs.pop("headers", utilities.HEADERS),
+
+            "experimental": kwargs.pop("experimental", False), "use_prebuilt_tkhtml": kwargs.pop("use_prebuilt_tkhtml", True),
+            "tkhtml_version": kwargs.pop("tkhtml_version", ""), "overflow_scroll_frame": kwargs.pop("overflow_scroll_frame", None),
+            "embed_obj": kwargs.pop("embed_obj", HtmlFrame), "manage_vsb_func": kwargs.pop("manage_vsb_func", self._manage_vsb),
+            "manage_hsb_func": kwargs.pop("manage_hsb_func", self._manage_hsb),
+        }
 
         self.root = root = tk.Tk()
-        self.html = html = TkinterWeb(root, kwargs)
-        self.document = HTMLDocument(html)
+        self.html = html = bindings.TkinterWeb(root, self._tkinterweb_options, **kwargs)
+        self.document = dom.HTMLDocument(html)
+
+        root.withdraw()
 
         if markup:
-            if os.path.isfile(markup):
-                markup = "file:///" + markup
-                markup, url, file, r = download(
-                    markup, headers=tuple(self.html.headers.items())
-                )
+            if isfile(markup): markup = "file:///" + markup
 
-            else:
-                parsed = urlparse(markup)
-                if parsed.scheme in frozenset({"https", "http"}):
-                    markup, url, file, r = cache_download(
-                        markup, headers=tuple(self.html.headers.items())
-                    )
+            parsed = urlparse(markup)
+            if parsed.scheme in frozenset({"file", "https", "http"}):
+
+                newurl, markup, filetype, code = html.download_url(markup)
 
             html.parse(markup)
 
