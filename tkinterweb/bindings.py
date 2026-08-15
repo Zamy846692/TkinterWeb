@@ -1849,6 +1849,7 @@ class TkinterHv3(tk.Widget):
 
         # Setup the settings variables
         threading = kwargs.pop("threading_enabled", None)
+        caches = kwargs.pop("caches_enabled", None)
         self._setup_settings(kwargs)
 
         self._load_tkhtml()
@@ -1877,11 +1878,14 @@ class TkinterHv3(tk.Widget):
 
         if threading is not None:
             setattr(self, "threading_enabled", threading)
+        if caches is not None:
+            setattr(self, "caches_enabled", caches)
 
     def _setup_settings(self, options):
         "Widget settings."
         settings = {
             "messages_enabled": True,
+            "caches_enabled": True,
 
             "use_prebuilt_tkhtml": True,
             "tkhtml_version": "",
@@ -1900,6 +1904,21 @@ class TkinterHv3(tk.Widget):
     def post_message(self, message):
         "Post a message."
         if self.messages_enabled: self.message_func(message)
+
+    @utilities.special_setting(True)
+    def caches_enabled(self, prev_enabled, enabled):
+        "Enable or disable caching."
+        if prev_enabled != enabled:
+            self.imagecache = enabled
+            if not enabled: utilities.lru_cache.clear()
+
+    @property
+    def imagecache(self):
+        return bool(self.tk.call(self._w, "html", "cget", "-imagecache"))
+
+    @imagecache.setter
+    def imagecache(self, toggle):
+        self.tk.call(self._w, "html", "configure", "-imagecache", toggle)
 
     def _load_tkhtml(self):
         "Load Tkhtml"
@@ -1943,40 +1962,51 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
     def _requestcmd(self, handle):
         "Fetch any requests made by Hv3"
         request = Hv3Request(handle, self) # Embed the Tcl request command in the python class
-        self._thread_check(self.fetch_request, request)
-        self.post_message(f"Fetching {request['mimetype']} from {utilities.shorten(request['uri'])}")
-
-    def fetch_request(self, handle):
-        thread = utilities.get_current_thread()
-        self.active_threads.append(thread)
-
-        uri = handle["uri"] # Get URI of the request
+        url = request["uri"] # Get URL of the request
         # Parse the URI to find the correct way to load the request
-        parsed = TkHtmlParsedURI(uri, self)
-        
-        # Specify download parameters and set the headers for the underlying Tk/Hv3 widget
-        kw = dict(url=uri, decode=False, insecure=False, headers=tuple(self.headers.items()))
-        handle.configure(requestheader=kw["headers"])
-        mimetype = handle["mimetype"]
+        parsed = TkHtmlParsedURI(url, self)
+
+        self.post_message(f"Fetching {request['mimetype']} from {utilities.shorten(url)}")
 
         try:
             if parsed.scheme == "home":
-                data = parsed.path.lstrip("/")
-            elif parsed.scheme == "file":
-                newurl, data, filetype, code = utilities.download(**kw)
-                handle.configure(uri=newurl)
-            elif parsed.scheme == "http" or parsed.scheme == "https":
-                newurl, data, filetype, code = utilities.cache_download(**kw)
-                handle.configure(uri=newurl)
+                handle.append(parsed.path.lstrip("/"))
 
-            handle.append(data) # Pass accumulated URI response back into the Tcl widget. Must be in binary format for this to work
-            self.post_message(f"Fetched {mimetype} from {utilities.shorten(handle['uri'])}")
-            
+            elif parsed.scheme == "file":
+                request.configure(requestheader=self.headers.items())
+                newurl, data, filetype, code = utilities.download(url, headers=tuple(self.headers.items()))
+                request.configure(uri=newurl)
+                request.append(data) # Pass accumulated URI response back into the Tcl widget. Must be in binary format for this to work
+                self.post_message(f"Fetched {request['mimetype']} from {utilities.shorten(url)}")
+
+            else:
+                self._thread_check(self._continue_loading, request)
+
         except Exception as error:
-            self.post_message(f"ERROR: could not load {mimetype} {uri}: {error}")
+            self.post_message(f"ERROR: could not load {request['mimetype']} {url}: {error}")
+
+    def _continue_loading(self, request):
+        thread = utilities.get_current_thread()
+        self.active_threads.append(thread)
+        url = request["uri"] # Get URL of the request
+
+        try:
+            if self.caches_enabled:
+                newurl, data, filetype, code = utilities.cache_download(url, headers=tuple(self.headers.items()))
+            else:
+                newurl, data, filetype, code = utilities.download(url, headers=tuple(self.headers.items()))
+
+            request.configure(uri=newurl)
+            request.append(data) # Pass accumulated URI response back into the Tcl widget. Must be in binary format for this to work
+
+            self.post_message(f"Fetched {request['mimetype']} from {utilities.shorten(url)}")
+
+        except Exception as error:
+            self.post_message(f"ERROR: could not load {request['mimetype']} {url}: {error}")
 
         # Clean-up paraphernalia left in the memory
-        self.active_threads.remove(thread)
+        if thread.isrunning():
+            self.active_threads.remove(thread)
 
     def goto(self, url, *a, cnf={}, **kw):
         """Load the content at the specified URI into the widget.
@@ -2065,7 +2095,10 @@ class Hv3Request():
 
     def __del__(self):
         "Called after all data has been passed to [append]."
-        self.tk.call(self.request, "finish")
+        try:
+            self.tk.call(self.request, "finish")
+        except tk.TclError:  # Object has been destroyed
+            pass
 
     @property
     def authority(self):
