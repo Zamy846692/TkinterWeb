@@ -1870,12 +1870,16 @@ class TkinterHv3(tk.Widget):
         tk.Widget.__init__(self, master, "::hv3::hv3", kwargs)
         self.focus_set()
 
+        # Handle widget destruction
+        self.bind("<Destroy>", self._on_destroy)
+
         # Setup threading settings
         try:
             self.allow_threading = bool(self.tk.call("set", "tcl_platform(threaded)"))
         except tk.TclError:
             self.allow_threading = True
 
+        # Set remaining settings
         if threading is not None:
             setattr(self, "threading_enabled", threading)
         if caches is not None:
@@ -1885,7 +1889,6 @@ class TkinterHv3(tk.Widget):
         "Widget settings."
         settings = {
             "messages_enabled": True,
-            "caches_enabled": True,
 
             "use_prebuilt_tkhtml": True,
             "tkhtml_version": "",
@@ -1900,6 +1903,12 @@ class TkinterHv3(tk.Widget):
         settings.update(options)
         for key, value in settings.items():
             setattr(self, key, options.pop(key, value))
+
+        return settings
+
+    def _on_destroy(self, event):
+        "Stop threads when widget is destroyed."
+        if event.widget is self: self.stop_threads()
         
     def post_message(self, message):
         "Post a message."
@@ -1974,21 +1983,23 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
 
             elif parsed.scheme == "file":
                 request.configure(requestheader=self.headers.items())
+                
                 newurl, data, filetype, code = utilities.download(url, headers=tuple(self.headers.items()))
+                
                 request.configure(uri=newurl)
                 request.append(data) # Pass accumulated URI response back into the Tcl widget. Must be in binary format for this to work
+
                 self.post_message(f"Fetched {request['mimetype']} from {utilities.shorten(url)}")
 
             else:
-                self._thread_check(self._continue_loading, request)
+                self._thread_check(self._continue_loading, request, url)
 
         except Exception as error:
             self.post_message(f"ERROR: could not load {request['mimetype']} {url}: {error}")
 
-    def _continue_loading(self, request):
+    def _continue_loading(self, request, url):
         thread = utilities.get_current_thread()
         self.active_threads.append(thread)
-        url = request["uri"] # Get URL of the request
 
         try:
             if self.caches_enabled:
@@ -1996,17 +2007,23 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
             else:
                 newurl, data, filetype, code = utilities.download(url, headers=tuple(self.headers.items()))
 
-            request.configure(uri=newurl)
-            request.append(data) # Pass accumulated URI response back into the Tcl widget. Must be in binary format for this to work
-
-            self.post_message(f"Fetched {request['mimetype']} from {utilities.shorten(url)}")
+            if thread.isrunning():
+                request.configure(uri=newurl)
+                request.append(data)
+                self.post_message(f"Fetched {request['mimetype']} from {utilities.shorten(url)}")
 
         except Exception as error:
-            self.post_message(f"ERROR: could not load {request['mimetype']} {url}: {error}")
+            if thread.isrunning():
+                self.post_message(f"ERROR: could not load {request['mimetype']} {url}: {error}")
 
         # Clean-up paraphernalia left in the memory
         if thread.isrunning():
             self.active_threads.remove(thread)
+
+    def stop_threads(self):
+        "Stop threads when widget is destroyed."
+        for thread in self.active_threads:
+            thread.stop()
 
     def goto(self, url, *a, cnf={}, **kw):
         """Load the content at the specified URI into the widget.
@@ -2019,6 +2036,7 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
 
     def stop(self):
         "Cancel all pending downloads."
+        self.stop_threads()
         self.tk.call(self._w, "stop")
 
     def reset(self):
@@ -2097,7 +2115,7 @@ class Hv3Request():
         "Called after all data has been passed to [append]."
         try:
             self.tk.call(self.request, "finish")
-        except tk.TclError:  # Object has been destroyed
+        except (tk.TclError, RuntimeError):  # Object has been destroyed
             pass
 
     @property
