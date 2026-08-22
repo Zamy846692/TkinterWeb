@@ -1848,7 +1848,6 @@ class TkinterHv3(tk.Widget):
         self.active_threads = []
 
         # Setup the settings variables
-        threading = kwargs.pop("threading_enabled", None)
         caches = kwargs.pop("caches_enabled", None)
         self._setup_settings(kwargs)
 
@@ -1880,14 +1879,14 @@ class TkinterHv3(tk.Widget):
             self.allow_threading = True
 
         # Set remaining settings
-        if threading is not None:
-            setattr(self, "threading_enabled", threading)
         if caches is not None:
             setattr(self, "caches_enabled", caches)
 
     def _setup_settings(self, options):
         "Widget settings."
         settings = {
+            "threading_enabled": True,
+
             "messages_enabled": True,
 
             "use_prebuilt_tkhtml": True,
@@ -1898,6 +1897,9 @@ class TkinterHv3(tk.Widget):
 
             "message_func": utilities.notifier,
 
+            "insecure_https": utilities.INSECURE_HTTPS,
+            "ssl_cafile": utilities.SSL_CAFILE,
+            "request_timeout": utilities.REQUEST_TIMEOUT,
             "headers": utilities.HEADERS,
         }
         settings.update(options)
@@ -1959,6 +1961,9 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
         self.tkhtml_version = float(loaded_version)
         self.using_tkhtml30 = float(loaded_version) == 3
 
+    def _check_url_cache_state(self, request, url, *args):
+        return utilities.check_download(url, *args, insecure=self.insecure_https, cafile=self.ssl_cafile, headers=tuple(self.headers.items()), timeout=self.request_timeout)
+
     def _thread_check(self, callback, *args, **kwargs):
         if not self.allow_threading:
             callback(*args, **kwargs)
@@ -2003,9 +2008,9 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
 
         try:
             if self.caches_enabled:
-                newurl, data, filetype, code = utilities.cache_download(url, headers=tuple(self.headers.items()))
+                newurl, data, filetype, code = utilities.cache_download(url, insecure=self.insecure_https, cafile=self.ssl_cafile, headers=tuple(self.headers.items()), timeout=self.request_timeout)
             else:
-                newurl, data, filetype, code = utilities.download(url, headers=tuple(self.headers.items()))
+                newurl, data, filetype, code = utilities.download(url, insecure=self.insecure_https, cafile=self.ssl_cafile, headers=tuple(self.headers.items()), timeout=self.request_timeout)
 
             if thread.isrunning():
                 request.configure(uri=newurl)
@@ -2017,8 +2022,7 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
                 self.post_message(f"ERROR: could not load {request['mimetype']} {url}: {error}")
 
         # Clean-up paraphernalia left in the memory
-        if thread.isrunning():
-            self.active_threads.remove(thread)
+        self.active_threads.remove(thread)
 
     def stop_threads(self):
         "Stop threads when widget is destroyed."
