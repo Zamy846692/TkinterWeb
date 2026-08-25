@@ -1848,6 +1848,7 @@ class TkinterHv3(tk.Widget):
         self.active_threads = []
 
         # Setup the settings variables
+        threading = kwargs.pop("threading_enabled", None)
         caches = kwargs.pop("caches_enabled", None)
         self._setup_settings(kwargs)
 
@@ -1879,14 +1880,14 @@ class TkinterHv3(tk.Widget):
             self.allow_threading = True
 
         # Set remaining settings
+        if threading is not None:
+            setattr(self, "threading_enabled", threading)
         if caches is not None:
             setattr(self, "caches_enabled", caches)
 
     def _setup_settings(self, options):
         "Widget settings."
         settings = {
-            "threading_enabled": True,
-
             "messages_enabled": True,
 
             "use_prebuilt_tkhtml": True,
@@ -1922,6 +1923,16 @@ class TkinterHv3(tk.Widget):
         if prev_enabled != enabled:
             self.imagecache = enabled
             if not enabled: utilities.lru_cache.clear()
+
+    @utilities.special_setting(True)
+    def threading_enabled(self, prev_enabled, enabled):
+        "Warn the user when disabling threading and ensure that threading is disabled if Tcl/Tk is not built with thread support."
+        if self.allow_threading:
+            if prev_enabled:
+                self.stop_threads()
+                self.post_message("WARNING: threading is disabled. Your app may hang while loading webpages.")
+        else:
+            self.post_message("WARNING: threading is disabled because your Tcl/Tk library does not support threading. Your app may hang while loading webpages.")
 
     @property
     def imagecache(self):
@@ -1961,17 +1972,16 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
         self.tkhtml_version = float(loaded_version)
         self.using_tkhtml30 = float(loaded_version) == 3
 
-    def _check_url_cache_state(self, request, url, *args):
+    def _check_url_cache_state(self, url, *args):
         return utilities.check_download(url, *args, insecure=self.insecure_https, cafile=self.ssl_cafile, headers=tuple(self.headers.items()), timeout=self.request_timeout)
 
     def _thread_check(self, callback, *args, **kwargs):
-        if not self.allow_threading:
+        if not self.threading_enabled:
             callback(*args, **kwargs)
         elif len(self.active_threads) >= self.maximum_thread_count:
             self.after(500, lambda callback=callback, args=args: self._thread_check(callback, *args, **kwargs))
         else:
-            thread = utilities.StoppableThread(target=callback, args=args, kwargs=kwargs)
-            thread.start()
+            utilities.StoppableThread(target=callback, args=args, kwargs=kwargs).start()
 
     def _requestcmd(self, handle):
         "Fetch any requests made by Hv3"
@@ -1984,7 +1994,7 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
 
         try:
             if parsed.scheme == "home":
-                handle.append(parsed.path.lstrip("/"))
+                request.append(parsed.path.lstrip("/"))
 
             elif parsed.scheme == "file":
                 request.configure(requestheader=self.headers.items())
@@ -2012,14 +2022,13 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
             else:
                 newurl, data, filetype, code = utilities.download(url, insecure=self.insecure_https, cafile=self.ssl_cafile, headers=tuple(self.headers.items()), timeout=self.request_timeout)
 
-            if thread.isrunning():
-                request.configure(uri=newurl)
-                request.append(data)
-                self.post_message(f"Fetched {request['mimetype']} from {utilities.shorten(url)}")
+            request.configure(uri=newurl)
+            request.append(data)
+
+            self.post_message(f"Fetched {request['mimetype']} from {utilities.shorten(url)}")
 
         except Exception as error:
-            if thread.isrunning():
-                self.post_message(f"ERROR: could not load {request['mimetype']} {url}: {error}")
+            self.post_message(f"ERROR: could not load {request['mimetype']} {url}: {error}")
 
         # Clean-up paraphernalia left in the memory
         self.active_threads.remove(thread)
