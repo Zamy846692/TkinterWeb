@@ -1976,7 +1976,7 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
         return utilities.check_download(url, *args, insecure=self.insecure_https, cafile=self.ssl_cafile, headers=tuple(self.headers.items()), timeout=self.request_timeout)
 
     def _thread_check(self, callback, *args, **kwargs):
-        if not self.threading_enabled:
+        if not self.threading_enabled or self._check_url_cache_state(args[1]):
             callback(*args, **kwargs)
         elif len(self.active_threads) >= self.maximum_thread_count:
             self.after(500, lambda callback=callback, args=args: self._thread_check(callback, *args, **kwargs))

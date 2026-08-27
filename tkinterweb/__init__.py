@@ -29,7 +29,7 @@ See https://tkinterweb.readthedocs.io/en/latest/faq.html for more information."
     sys.exit()
 
 
-__all__ = ['Demo', 'HtmlFrame', 'HtmlLabel', 'HtmlText', 'HtmlParse', 'Notebook', 'TkHtmlParsedURI', 'TkinterWeb']
+__all__ = ['Demo', 'HtmlFrame', 'HtmlLabel', 'HtmlText', 'HtmlParse', 'Notebook', 'TkHtmlParsedURI', 'TkinterHv3', 'TkinterWeb']
 
 
 class Demo():
