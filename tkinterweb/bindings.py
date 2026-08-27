@@ -2007,9 +2007,10 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
                 request.append(parsed.path.lstrip("/"))
 
             elif parsed.scheme == "file":
-                request.configure(requestheader=self.headers.items())
+                headers = tuple(self.headers.items())
+                request.configure(requestheader=headers)
                 
-                newurl, data, filetype, code = utilities.download(url, headers=tuple(self.headers.items()))
+                newurl, data, filetype, code = utilities.download(url, headers=headers)
                 
                 request.configure(uri=newurl)
                 request.append(data) # Pass accumulated URI response back into the Tcl widget. Must be in binary format for this to work
@@ -2047,15 +2048,20 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
         return utilities.BUILTIN_PAGES[url].format(bg=self.about_page_background, fg=self.about_page_foreground, i1=i1, i2=i2)
 
     def _continue_loading(self, request, url):
+        url = sub(r"^(https?):/(?!/)", r"\1://", url)
+        request.configure(uri=url)
         thread = utilities.get_current_thread()
         self.active_threads.append(thread)
+
+        headers = tuple(self.headers.items())
+        request.configure(requestheader=headers)
 
         code = 404
         try:
             if self.caches_enabled:
-                newurl, data, filetype, code = utilities.cache_download(url, insecure=self.insecure_https, cafile=self.ssl_cafile, headers=tuple(self.headers.items()), timeout=self.request_timeout)
+                newurl, data, filetype, code = utilities.cache_download(url, insecure=self.insecure_https, cafile=self.ssl_cafile, headers=headers, timeout=self.request_timeout)
             else:
-                newurl, data, filetype, code = utilities.download(url, insecure=self.insecure_https, cafile=self.ssl_cafile, headers=tuple(self.headers.items()), timeout=self.request_timeout)
+                newurl, data, filetype, code = utilities.download(url, insecure=self.insecure_https, cafile=self.ssl_cafile, headers=headers, timeout=self.request_timeout)
 
             request.configure(uri=newurl)
             request.append(data)
