@@ -1846,6 +1846,7 @@ class TkinterHv3(tk.Widget):
     def __init__(self, master, hv, **kwargs):
         self.master = master
         self.active_threads = []
+        self._style = None
 
         # Setup the settings variables
         threading = kwargs.pop("threading_enabled", None)
@@ -1897,6 +1898,10 @@ class TkinterHv3(tk.Widget):
             "maximum_thread_count": 20,
 
             "message_func": utilities.notifier,
+            "on_navigate_fail": self.show_error_page,
+
+            "about_page_background": "",
+            "about_page_foreground": "",
 
             "insecure_https": utilities.INSECURE_HTTPS,
             "ssl_cafile": utilities.SSL_CAFILE,
@@ -1916,6 +1921,10 @@ class TkinterHv3(tk.Widget):
     def post_message(self, message):
         "Post a message."
         if self.messages_enabled: self.message_func(message)
+
+    def show_error_page(self, url, error, code):
+        if self.winfo_exists():
+            self.goto(self._get_about_page("about:error", code))
 
     @utilities.special_setting(True)
     def caches_enabled(self, prev_enabled, enabled):
@@ -1992,6 +2001,7 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
 
         self.post_message(f"Fetching {request['mimetype']} from {utilities.shorten(url)}")
 
+        code = 404
         try:
             if parsed.scheme == "home":
                 request.append(parsed.path.lstrip("/"))
@@ -2011,11 +2021,36 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
 
         except Exception as error:
             self.post_message(f"ERROR: could not load {request['mimetype']} {url}: {error}")
+            if self.on_navigate_fail is not None:
+                self.on_navigate_fail(url, error, code)
+
+    def _get_about_page(self, url, i1="", i2=""):
+        style_type = None
+        if not self.about_page_background:
+            if not self._style:
+                from tkinter.ttk import Style
+                self._style = Style()
+            try:
+                style_type = self.cget("style")
+            except tk.TclError:
+                style_type = "TFrame"
+            self.about_page_background = self._style.lookup(style_type, "background") or "#ffffff"
+        if not self.about_page_foreground:
+            if not self._style:
+                self._style = Style()
+            if not style_type:
+                try:
+                    style_type = self.cget("style")
+                except tk.TclError:
+                    style_type = "TFrame"
+            self.about_page_foreground = self._style.lookup(style_type, "foreground") or "#000000"
+        return utilities.BUILTIN_PAGES[url].format(bg=self.about_page_background, fg=self.about_page_foreground, i1=i1, i2=i2)
 
     def _continue_loading(self, request, url):
         thread = utilities.get_current_thread()
         self.active_threads.append(thread)
 
+        code = 404
         try:
             if self.caches_enabled:
                 newurl, data, filetype, code = utilities.cache_download(url, insecure=self.insecure_https, cafile=self.ssl_cafile, headers=tuple(self.headers.items()), timeout=self.request_timeout)
@@ -2029,6 +2064,8 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
 
         except Exception as error:
             self.post_message(f"ERROR: could not load {request['mimetype']} {url}: {error}")
+            if self.on_navigate_fail is not None:
+                self.on_navigate_fail(url, error, code)
 
         # Clean-up paraphernalia left in the memory
         self.active_threads.remove(thread)
