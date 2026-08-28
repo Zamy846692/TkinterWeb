@@ -2138,6 +2138,24 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
     def selected(self):
         "Return the currently selected text, or an empty string if no text is currently selected."
         return self.tk.call(self._w, "selected")
+
+    def postscript(self, cnf={}, **kwargs):
+        """Print the contents of the canvas to a postscript file.
+        Valid options: colormap, colormode, file, fontmap, height, 
+        pageanchor, pageheight, pagesize, pagewidth, pagex, pagey, 
+        nobg, noimages, rotate, width, x, and y.
+        Does not work unless experimental Tkhtml is used.
+
+        :param kwargs: Other valid options are colormap, colormode, file, fontmap, height, pageanchor, pageheight, pagesize (can be A3, A4, A5, LEGAL, and LETTER), pagewidth, pagex, pagey, nobg, noimages, rotate, width, x, and y.
+        :return: A string containing the PostScript code.
+        :rtype: str
+        :raise NotImplementedError: If experimental mode is not enabled."""
+        if not self.experimental:
+            self._html.post_message("ERROR: The page could not be printed because print_page is an experimental feature")
+            raise NotImplementedError("the page could not be printed because print_page is an experimental feature")
+
+        self.update() # Update the root window to ensure HTML is rendered
+        return self.tk.call((self._w, "postscript")+self._options(cnf, kwargs))
     
     # --- Tkhtml URIs ---------------------------------------------------------
 
