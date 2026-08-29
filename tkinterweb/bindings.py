@@ -1846,6 +1846,7 @@ class TkinterHv3(tk.Widget):
     def __init__(self, master, hv, **kwargs):
         self.master = master
         self.active_threads = []
+        self.pending_threads = set()
         self._style = None
 
         # Setup the settings variables
@@ -1922,7 +1923,7 @@ class TkinterHv3(tk.Widget):
         "Post a message."
         if self.messages_enabled: self.message_func(message)
 
-    def show_error_page(self, url, error, code):
+    def show_error_page(self, request, error, code):
         if self.winfo_exists():
             self.goto(self._get_about_page("about:error", code))
 
@@ -1938,7 +1939,6 @@ class TkinterHv3(tk.Widget):
         "Warn the user when disabling threading and ensure that threading is disabled if Tcl/Tk is not built with thread support."
         if self.allow_threading:
             if prev_enabled:
-                self.stop_threads()
                 self.post_message("WARNING: threading is disabled. Your app may hang while loading webpages.")
         else:
             self.post_message("WARNING: threading is disabled because your Tcl/Tk library does not support threading. Your app may hang while loading webpages.")
@@ -1987,10 +1987,12 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
     def _thread_check(self, callback, *args, **kwargs):
         if not self.threading_enabled or self._check_url_cache_state(args[1]):
             callback(*args, **kwargs)
-        elif len(self.active_threads) >= self.maximum_thread_count:
-            self.after(500, lambda callback=callback, args=args: self._thread_check(callback, *args, **kwargs))
+            return
+        thread = utilities.StoppableThread(target=callback, args=args, kwargs=kwargs)
+        if len(self.active_threads) >= self.maximum_thread_count:
+            self.pending_threads.add(thread)
         else:
-            utilities.StoppableThread(target=callback, args=args, kwargs=kwargs).start()
+            thread.start()
 
     def _requestcmd(self, handle):
         "Fetch any requests made by Hv3"
@@ -2022,8 +2024,7 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
 
         except Exception as error:
             self.post_message(f"ERROR: could not load {request['mimetype']} {url}: {error}")
-            if self.on_navigate_fail is not None:
-                self.on_navigate_fail(url, error, code)
+            self._run_loading_error(request, error, code)
 
     def _get_about_page(self, url, i1="", i2=""):
         style_type = None
@@ -2038,6 +2039,7 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
             self.about_page_background = self._style.lookup(style_type, "background") or "#ffffff"
         if not self.about_page_foreground:
             if not self._style:
+                from tkinter.ttk import Style
                 self._style = Style()
             if not style_type:
                 try:
@@ -2070,16 +2072,23 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
 
         except Exception as error:
             self.post_message(f"ERROR: could not load {request['mimetype']} {url}: {error}")
-            if self.on_navigate_fail is not None:
-                self.on_navigate_fail(url, error, code)
+            if thread.isrunning():
+                self._run_loading_error(request, error, code)
 
         # Clean-up paraphernalia left in the memory
         self.active_threads.remove(thread)
 
+        if thread.isrunning() and thread.is_subthread and self.pending_threads:
+            self.pending_threads.pop().start()
+
     def stop_threads(self):
         "Stop threads when widget is destroyed."
-        for thread in self.active_threads:
-            thread.stop()
+        for thr in self.active_threads: thr.stop()
+        self.pending_threads.clear()
+
+    def _run_loading_error(self, request, error, code):
+        if self.on_navigate_fail is not None and request["mimetype"] == "text/html":
+            self.on_navigate_fail(request, error, code)
 
     def goto(self, url, *a, cnf={}, **kw):
         """Load the content at the specified URI into the widget.
@@ -2095,9 +2104,9 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
         self.stop_threads()
         self.tk.call(self._w, "stop")
 
-    def reset(self):
+    def reset(self, isSaveState=False):
         "Wrapper around the html widget command of the same name. Also resets all document related state stored by the mega-widget."
-        self.tk.call(self._w, "reset")
+        self.tk.call(self._w, "reset", isSaveState)
 
     def node(self, *args):
         "Caching wrapper around html widget [node] command."
