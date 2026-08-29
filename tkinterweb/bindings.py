@@ -1925,7 +1925,13 @@ class TkinterHv3(tk.Widget):
 
     def show_error_page(self, request, error, code):
         if self.winfo_exists():
-            self.goto(self._get_about_page("about:error", code))
+            page = self._get_about_page("about:error", code)
+            try:
+                request.append(page)
+            except Exception:
+                self.goto(page)
+            except Exception as e:
+                self.post_message(e)
 
     @utilities.special_setting(True)
     def caches_enabled(self, prev_enabled, enabled):
