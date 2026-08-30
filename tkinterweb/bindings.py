@@ -2029,7 +2029,6 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
                 self._thread_check(self._continue_loading, request, url)
 
         except Exception as error:
-            self.post_message(f"ERROR: could not load {request['mimetype']} {url}: {error}")
             self._run_loading_error(request, error, code)
 
     def _get_about_page(self, url, i1="", i2=""):
@@ -2069,7 +2068,7 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
 
     def _continue_loading(self, request, url):
         self.post_message(f"Fetching {request['mimetype']} from {utilities.shorten(url)}")
-        url = sub(r"^(https?):/(?!/)", r"\1://", url)
+        url = self.escape_uri(sub(r"^(https?):/(?!/)", r"\1://", url))
         request.configure(uri=url)
         thread = utilities.get_current_thread()
         self.active_threads.append(thread)
@@ -2089,7 +2088,6 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
             self._append_request(request, newurl, data)
 
         except Exception as error:
-            self.post_message(f"ERROR: could not load {request['mimetype']} {url}: {error}")
             if thread.isrunning():
                 self._run_loading_error(request, error, code)
 
@@ -2105,6 +2103,7 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
         self.pending_threads.clear()
 
     def _run_loading_error(self, request, error, code):
+        self.post_message(f"ERROR: could not load {request['mimetype']} {request['uri']}: {error}")
         if self.on_navigate_fail is not None and request["mimetype"] == "text/html":
             self.on_navigate_fail(request, error, code)
 
