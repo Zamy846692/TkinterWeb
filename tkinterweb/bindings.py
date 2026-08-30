@@ -1901,8 +1901,8 @@ class TkinterHv3(tk.Widget):
             "message_func": utilities.notifier,
             "on_navigate_fail": self.show_error_page,
 
-            "about_page_background": "",
-            "about_page_foreground": "",
+            "about_page_background": "#000000",
+            "about_page_foreground": "#ffffff",
 
             "insecure_https": utilities.INSECURE_HTTPS,
             "ssl_cafile": utilities.SSL_CAFILE,
@@ -2032,26 +2032,6 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
             self._run_loading_error(request, error, code)
 
     def _get_about_page(self, url, i1="", i2=""):
-        style_type = None
-        if not self.about_page_background:
-            if not self._style:
-                from tkinter.ttk import Style
-                self._style = Style()
-            try:
-                style_type = self.cget("style")
-            except tk.TclError:
-                style_type = "TFrame"
-            self.about_page_background = self._style.lookup(style_type, "background") or "#ffffff"
-        if not self.about_page_foreground:
-            if not self._style:
-                from tkinter.ttk import Style
-                self._style = Style()
-            if not style_type:
-                try:
-                    style_type = self.cget("style")
-                except tk.TclError:
-                    style_type = "TFrame"
-            self.about_page_foreground = self._style.lookup(style_type, "foreground") or "#000000"
         return utilities.BUILTIN_PAGES[url].format(bg=self.about_page_background, fg=self.about_page_foreground, i1=i1, i2=i2)
 
     def _append_request(self, request, url, data):
