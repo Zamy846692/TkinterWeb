@@ -2007,7 +2007,9 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
         # Parse the URI to find the correct way to load the request
         parsed = TkHtmlParsedURI(url, self)
 
-        self.post_message(f"Fetching {request['mimetype']} from {utilities.shorten(url)}")
+        #self.post_message(f"Fetching {request['mimetype']} from {utilities.shorten(url)}")
+
+        data, method = self._withdraw_request(request)
 
         code = 404
         try:
@@ -2015,15 +2017,13 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
                 request.append(parsed.path.lstrip("/"))
 
             elif parsed.scheme == "file":
+                self.post_message(f"Fetching {request['mimetype']} from {utilities.shorten(url)}")
                 headers = tuple(self.headers.items())
                 request.configure(requestheader=headers)
                 
-                newurl, data, filetype, code = utilities.download(url, headers=headers)
-                
-                request.configure(uri=newurl)
-                request.append(data) # Pass accumulated URI response back into the Tcl widget. Must be in binary format for this to work
+                newurl, data, filetype, code = utilities.download(url, data, method, insecure=self.insecure_https, cafile=self.ssl_cafile, headers=headers, timeout=self.request_timeout)
 
-                self.post_message(f"Fetched {request['mimetype']} from {utilities.shorten(url)}")
+                self._append_request(request, newurl, data)
 
             else:
                 self._thread_check(self._continue_loading, request, url)
@@ -2055,7 +2055,20 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
             self.about_page_foreground = self._style.lookup(style_type, "foreground") or "#000000"
         return utilities.BUILTIN_PAGES[url].format(bg=self.about_page_background, fg=self.about_page_foreground, i1=i1, i2=i2)
 
+    def _append_request(self, request, url, data):
+        request.configure(uri=url)
+        request.append(data) # Pass accumulated URI response back into the Tcl widget. Must be in binary format for this to work
+        self.post_message(f"Loaded {request['mimetype']} from {utilities.shorten(url)}")
+
+    def _withdraw_request(self, request):
+        data = request.cget("postdata")
+        if data:
+            return data.encode(), "POST"
+        else:
+            return data, "GET"
+
     def _continue_loading(self, request, url):
+        self.post_message(f"Fetching {request['mimetype']} from {utilities.shorten(url)}")
         url = sub(r"^(https?):/(?!/)", r"\1://", url)
         request.configure(uri=url)
         thread = utilities.get_current_thread()
@@ -2064,17 +2077,16 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
         headers = tuple(self.headers.items())
         request.configure(requestheader=headers)
 
+        data, method = self._withdraw_request(request)
+
         code = 404
         try:
             if self.caches_enabled:
-                newurl, data, filetype, code = utilities.cache_download(url, insecure=self.insecure_https, cafile=self.ssl_cafile, headers=headers, timeout=self.request_timeout)
+                newurl, data, filetype, code = utilities.cache_download(url, data, method, insecure=self.insecure_https, cafile=self.ssl_cafile, headers=headers, timeout=self.request_timeout)
             else:
-                newurl, data, filetype, code = utilities.download(url, insecure=self.insecure_https, cafile=self.ssl_cafile, headers=headers, timeout=self.request_timeout)
+                newurl, data, filetype, code = utilities.download(url, data, method, insecure=self.insecure_https, cafile=self.ssl_cafile, headers=headers, timeout=self.request_timeout)
 
-            request.configure(uri=newurl)
-            request.append(data)
-
-            self.post_message(f"Fetched {request['mimetype']} from {utilities.shorten(url)}")
+            self._append_request(request, newurl, data)
 
         except Exception as error:
             self.post_message(f"ERROR: could not load {request['mimetype']} {url}: {error}")
