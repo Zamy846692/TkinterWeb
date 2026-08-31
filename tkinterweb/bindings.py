@@ -1901,8 +1901,7 @@ class TkinterHv3(tk.Widget):
             "message_func": utilities.notifier,
             "on_navigate_fail": self.show_error_page,
 
-            "about_page_background": "#000000",
-            "about_page_foreground": "#ffffff",
+            "error_bg": 0x000000,
 
             "insecure_https": utilities.INSECURE_HTTPS,
             "ssl_cafile": utilities.SSL_CAFILE,
@@ -1912,6 +1911,8 @@ class TkinterHv3(tk.Widget):
         settings.update(options)
         for key, value in settings.items():
             setattr(self, key, options.pop(key, value))
+        if self.error_bg > 0xffffff:
+            self.error_bg = 0xffffff
 
         return settings
 
@@ -1925,7 +1926,9 @@ class TkinterHv3(tk.Widget):
 
     def show_error_page(self, request, error, code):
         if self.winfo_exists():
-            page = self._get_about_page("about:error", code)
+            fg = f"#{~self.error_bg & 0xffffff:06x}"
+            bg = f"#{self.error_bg:06x}"
+            page = f'<body bgcolor="{bg}"><center><h1 bgcolor="Red">{error}</h1></center><p color="{fg}"><code>{code}</code></p></body>'
             try:
                 request.append(page)
             except Exception:
@@ -2030,9 +2033,6 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
 
         except Exception as error:
             self._run_loading_error(request, error, code)
-
-    def _get_about_page(self, url, i1="", i2=""):
-        return utilities.BUILTIN_PAGES[url].format(bg=self.about_page_background, fg=self.about_page_foreground, i1=i1, i2=i2)
 
     def _append_request(self, request, url, data):
         request.configure(uri=url)
