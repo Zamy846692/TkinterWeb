@@ -2049,6 +2049,7 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
     def _continue_loading(self, request, url):
         self.post_message(f"Fetching {request['mimetype']} from {utilities.shorten(url)}")
         url = self.escape_uri(sub(r"^(https?):/(?!/)", r"\1://", url))
+        url = self.decode_uri(url).decode()
         request.configure(uri=url)
         thread = utilities.get_current_thread()
         self.active_threads.append(thread)
