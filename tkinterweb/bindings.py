@@ -1861,6 +1861,16 @@ class TkinterHv3(tk.Widget):
         master.tk.eval("package require snit")
         master.tk.eval("package require hv3")
 
+        # hv3's Tcl code uses `puts`. Without a console Tcl has no stdout
+        # channel, so the builtin puts raises and aborts whatever hv3 was
+        # doing (e.g. submitting a form) - send those messages to
+        # post_message() instead, but only when the channel is really missing
+        # and only rename the builtin once (a second widget must not fail).
+        if master.tk.eval("llength [chan names stdout]") == "0":
+            if master.tk.eval("llength [info commands ::tkinterweb_puts]") == "0":
+                master.tk.eval("rename ::puts ::tkinterweb_puts")
+            master.tk.createcommand("puts", self._puts_hook)
+
         # Register content loading infrastructure
         if "requestcmd" not in kwargs:
             kwargs["requestcmd"] = master.register(self._requestcmd)
@@ -1923,6 +1933,26 @@ class TkinterHv3(tk.Widget):
     def post_message(self, message):
         "Post a message."
         if self.messages_enabled: self.message_func(message)
+
+    def _puts_hook(self, *args):
+        "Tcl `puts` replacement used when the interpreter has no stdout channel."
+        original = args
+        if args and args[0] == "-nonewline":
+            args = args[1:]      # -nonewline only affects spacing, not the text
+        if len(args) == 2:
+            channel, text = args
+        elif len(args) == 1:
+            channel, text = "stdout", args[0]
+        else:
+            raise ValueError('wrong # args: should be "puts ?-nonewline? ?channelId? string"')  # bare `puts`: nothing to write
+        if channel not in ("stdout", "stderr"):
+            # puts on a real file channel: hand it to the original command
+            return self.master.tk.call("tkinterweb_puts", *original)
+
+        try:
+            self.post_message(text)
+        except Exception:
+            pass    # a failing message handler must never abort hv3
 
     def show_error_page(self, request, error, code):
         if self.winfo_exists():
