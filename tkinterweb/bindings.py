@@ -2258,6 +2258,6 @@ class Hv3Request():
 
     def cget(self, key):
         "Return the resource value for a KEY given as string."
-        return str(self.tk.call(self.request, 'cget', '-' + key))
+        return self.tk.call(self.request, 'cget', '-' + key)
 
     __getitem__ = cget
