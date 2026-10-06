@@ -2071,7 +2071,7 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
 
     def _withdraw_request(self, request):
         data = request.cget("postdata")
-        if data:
+        if data and str(data):
             return data.encode(), "POST"
         else:
             return data, "GET"
