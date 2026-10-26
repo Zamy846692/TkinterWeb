@@ -696,7 +696,7 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
         if post_event:
             self.post_event(utilities.DONE_LOADING_EVENT)
 
-    def parse_css(self, sheetid=None, data="", url=None, fallback_priority="author"):
+    def parse_css(self, sheetid=None, data="", url=None, errorvar=None, fallback_priority="author"):
         "Parse CSS code."
         if not url: url = self.base_url
         data = self._crash_prevention(data)
@@ -720,7 +720,9 @@ It is likely that not all dependencies are installed. Make sure Cairo is install
                 self._w, "style",
                 "-id", sheetid,
                 "-importcmd", importcmd,
-                "-urlcmd", urlcmd, data
+                "-urlcmd", urlcmd,
+                *(("-errorvar", errorvar) if errorvar else ""),
+                data
             )
         except tk.TclError:
             # The widget doesn't exist anymore
