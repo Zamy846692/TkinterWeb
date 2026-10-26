@@ -2151,10 +2151,7 @@ class HtmlText(HtmlFrame):
         
         return super().cget(key)
 
-    def config(self, **kwargs):
-        ""
-        self.configure(**kwargs)
-
+    config = configure
 
 class HtmlParse(HtmlFrame):
     """The :class:`HtmlParse` class parses HTML but does not spawn a widget. It inherits from the :class:`HtmlFrame` class. 

@@ -657,8 +657,8 @@ class StyleManager(utilities.BaseManager):
         except tk.TclError:
             return
 
-        if (("stylesheet" in rel)
-            and (media in {"screen", "print", "all"})):
+        if "stylesheet" in rel and \
+           media in ({"all", "print", "screen"} if self.html.experimental else {"all", "screen"}):
             self.html._thread_check(self.fetch_styles, url, node, media)
             # Onload is fired if and when the stylesheet is parsed
         elif "icon" in rel:
